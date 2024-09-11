@@ -261,3 +261,9 @@ FakesAssemblies/
 
 # Visual Studio 6 workspace options file
 *.opt
+NetworkGame/bin/Debug
+NetworkGame/obj/Debug
+NetworkGame/.vs/NetworkGame/v17
+NetworkGame/bin
+NetworkGame/obj
+NetworkGame/.vs/NetworkGame/v17
