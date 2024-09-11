@@ -1,0 +1,14 @@
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\bin\Debug\net8.0\NetworkGame.exe
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\bin\Debug\net8.0\NetworkGame.deps.json
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\bin\Debug\net8.0\NetworkGame.runtimeconfig.json
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\bin\Debug\net8.0\NetworkGame.dll
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\bin\Debug\net8.0\NetworkGame.pdb
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\obj\Debug\net8.0\NetworkGame.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\obj\Debug\net8.0\NetworkGame.AssemblyInfoInputs.cache
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\obj\Debug\net8.0\NetworkGame.AssemblyInfo.cs
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\obj\Debug\net8.0\NetworkGame.csproj.CoreCompileInputs.cache
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\obj\Debug\net8.0\NetworkGame.dll
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\obj\Debug\net8.0\refint\NetworkGame.dll
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\obj\Debug\net8.0\NetworkGame.pdb
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\obj\Debug\net8.0\NetworkGame.genruntimeconfig.cache
+C:\Users\oscar\Documents\Code Projects\C#\NetworkConsole\NetworkGame\obj\Debug\net8.0\ref\NetworkGame.dll
