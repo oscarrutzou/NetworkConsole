@@ -25,14 +25,27 @@ static class GameClientMain
         Open the new console    
         We ask for the username
         Join on the chat tcp server, is shown from the other console.
-        
         */
-
-        Console.WriteLine("Hallo");
-
-        Console.ReadKey();
+        Update();
     }
     
+    static void Update()
+    {
+        while (true)
+        {
+            Console.WriteLine("Skriv en besked til serveren:");
+            string message = Console.ReadLine();
+            byte[] sendData = Encoding.ASCII.GetBytes(message);
+            _udpClient.Send(sendData, _endPoint);
+
+            //Answer from server! 
+            byte[] receivedData = _udpClient.Receive(ref _endPoint);
+            string receivedMessage = Encoding.ASCII.GetString(receivedData);
+
+            Console.WriteLine($"Svar fra serveren: {receivedMessage} på adresse: {_endPoint}");
+        }
+    }
+
     #region UDP
 
     static void HeartBeatMessage()
