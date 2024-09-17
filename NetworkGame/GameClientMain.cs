@@ -20,12 +20,7 @@ static class GameClientMain
         heartbeatThread.IsBackground = true;
         heartbeatThread.Start();
 
-        /*  First open then wait for players
-        When 2 players have joined,
-        Open the new console    
-        We ask for the username
-        Join on the chat tcp server, is shown from the other console.
-        */
+
         Update();
     }
     
@@ -33,16 +28,23 @@ static class GameClientMain
     {
         while (true)
         {
-            Console.WriteLine("Skriv en besked til serveren:");
-            string message = Console.ReadLine();
-            byte[] sendData = Encoding.ASCII.GetBytes(message);
-            _udpClient.Send(sendData, _endPoint);
-
-            //Answer from server! 
-            byte[] receivedData = _udpClient.Receive(ref _endPoint);
-            string receivedMessage = Encoding.ASCII.GetString(receivedData);
-
-            Console.WriteLine($"Svar fra serveren: {receivedMessage} på adresse: {_endPoint}");
+            try
+            {
+                Console.WriteLine("Skriv en besked til serveren:");
+                string message = Console.ReadLine();
+                byte[] sendData = Encoding.ASCII.GetBytes(message);
+                _udpClient.Send(sendData, _endPoint);
+            }
+            catch (SocketException ex)
+            {
+                Console.WriteLine($"SocketException: {ex.Message}");
+                // Handle the exception (e.g., retry, log, etc.)
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception: {ex.Message}");
+                // Handle other exceptions
+            }
         }
     }
 
@@ -61,3 +63,9 @@ static class GameClientMain
 
     #endregion
 }
+/*  First open then wait for players
+When 2 players have joined,
+Open the new console    
+We ask for the username
+Join on the chat tcp server, is shown from the other console.
+*/

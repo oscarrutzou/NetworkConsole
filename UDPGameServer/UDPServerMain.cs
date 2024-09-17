@@ -9,7 +9,7 @@ public static class UDPServerMain
 {
     static int _gridX = 5;
     static int _gridY = 5;
-    static int _maxAmountOfPlayers = 2;
+    static int _maxAmountOfPlayers = 1;
     static Grid _grid;
 
 
@@ -21,16 +21,15 @@ public static class UDPServerMain
     {
         _grid = new Grid(_gridX, _gridY);
 
-        // Thread that handles the listener for the heartbeats
-        //Thread heartBeatListener = new Thread(HeartBeatListener);
-        //heartBeatListener.IsBackground = true;
-        //heartBeatListener.Start();
-
         // Thread that deletes clients if they have lost connection
         Thread heartBeatDeleteWhenOffline = new Thread(HeartBeatDeleteWhenOffline);
         heartBeatDeleteWhenOffline.IsBackground = true;
         heartBeatDeleteWhenOffline.Start();
 
+        // Thread that handles the listener for the heartbeats
+        //Thread heartBeatListener = new Thread(HeartBeatListener);
+        //heartBeatListener.IsBackground = true;
+        //heartBeatListener.Start();
         // Gameloop only starts when it has enough clients
         Thread gameLoop = new Thread(GameUpdate);
         gameLoop.IsBackground = true;
@@ -51,9 +50,10 @@ public static class UDPServerMain
             string receivedMessage = Encoding.ASCII.GetString(receivedData);
 
             // Add endpoint to a List
-            if (!clients.ContainsKey(clientEndPoint) && clients.Count < _maxAmountOfPlayers)
+            if (!clients.ContainsKey(clientEndPoint))
             {
                 clients.Add(clientEndPoint, DateTime.Now);
+                Console.WriteLine($"NEW:: {clientEndPoint} joined");
             }
 
             if (receivedMessage == "heartbeat")
@@ -62,29 +62,50 @@ public static class UDPServerMain
                 clients[clientEndPoint] = DateTime.Now;
                 continue;
             }
+
+            Console.WriteLine($"{clientEndPoint}: {receivedMessage}");
         }
     }
 
-    // When there is 2 clients we stop reciving clients.
-    //Console.WriteLine($"Modtaget: {receivedMessage} fra {clientEndPoint}");
 
-    //string responseMessage = "Tak for beskeden!";
-    //byte[] responseData = Encoding.ASCII.GetBytes(responseMessage);
-    //udpServer.Send(responseData, clientEndPoint);
     static void GameUpdate()
     {
         // Ask for turns
         // Give aceess so the first client can change pos
         // Say to the other client whos turn it is. 
         // Wait for answer
+        bool first = false;
         while (true)
         {
             Thread.Sleep(500);
-            if (clients.Count != _maxAmountOfPlayers) return;
 
-            Console.WriteLine("Now Awake");
+            if (clients.Count != _maxAmountOfPlayers) continue;
+            
+            if (!first)
+            {
+                first = true;
+                StartGame();
+                continue;
+            }
+
+            // Update loop
+            ChangeTurn();
         }
         
+    }
+
+    static void StartGame()
+    {
+        Console.WriteLine($"Started game with {clients.Count} players");
+        // Make world
+        // Sets players
+        // Sends full data to players (full grid)
+    }
+
+    private static int _turnNmb;
+    static void ChangeTurn()
+    {
+        _turnNmb = (_turnNmb + 1) % _maxAmountOfPlayers;
     }
 
     static void HeartBeatDeleteWhenOffline()
@@ -130,4 +151,19 @@ public static class UDPServerMain
 
      */
 
+
+
+    // When there is 2 clients we stop reciving clients.
+    //Console.WriteLine($"Modtaget: {receivedMessage} fra {clientEndPoint}");
+
+
+
+    // Answer from server!
+    //byte[] receivedData = _udpClient.Receive(ref _endPoint);
+    //string receivedMessage = Encoding.ASCII.GetString(receivedData);
+    //Console.WriteLine($"Svar fra serveren: {receivedMessage} på adresse: {_endPoint}");
+
+    //string responseMessage = "Tak for beskeden!";
+    //byte[] responseData = Encoding.ASCII.GetBytes(responseMessage);
+    //udpServer.Send(responseData, clientEndPoint);
 }
