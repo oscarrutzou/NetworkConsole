@@ -14,6 +14,12 @@ public class Point
     public int X { get; set; }
     [Key(1)]
     public int Y { get; set; }
+
+    public Point(int x, int y)
+    {
+        X = x;
+        Y = y;
+    }
 }
 
 [MessagePackObject]
@@ -49,7 +55,7 @@ public class Character
         return
         [
             $"|Owner: {OwnerID}".PadRight(11,' '),
-            $"|:{CharacterType}: {Name}".PadRight(11,' '),
+            $"|{CharacterType}".PadRight(11,' '),
             $"|HP: {CurrentHealth}/{MaxHealth}".PadRight(11,' '),
             $"|Attack: {Damage}".PadRight(11,' '),
             "|__________"

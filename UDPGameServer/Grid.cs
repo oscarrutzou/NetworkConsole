@@ -11,7 +11,7 @@ namespace UDPGameServer;
 public class Grid
 {
     [Key(0)]
-    public Character[,] grid;
+    public Character[,] CharacterGrid;
     private static string[] _objectFields = new string[]
     {
         "|          ",
@@ -23,46 +23,46 @@ public class Grid
 
     public Grid(int x, int y)
     {
-        grid = new Character[x, y];
+        CharacterGrid = new Character[x, y];
     }
 
     public void AddObject(Character character, int x, int y)
     {
-        grid[x, y] = character;
+        CharacterGrid[x, y] = character;
     }
 
     public void MoveObject(int oldX, int oldY, int newX, int newY)
     {
-        if (oldX > grid.GetLength(0))
+        if (oldX > CharacterGrid.GetLength(0))
         {
             Console.WriteLine($"first input {oldX} is out of bounds!");
             return;
         }
-        if (oldY > grid.GetLength(1))
+        if (oldY > CharacterGrid.GetLength(1))
         {
             Console.WriteLine($"second input{oldY} is out of bounds!");
             return;
         }
-        if (newX > grid.GetLength(0))
+        if (newX > CharacterGrid.GetLength(0))
         {
             Console.WriteLine($"third input{newX} is out of bounds!");
             return;
         }
-        if (newY > grid.GetLength(0))
+        if (newY > CharacterGrid.GetLength(0))
         {
             Console.WriteLine($"fourth input{newY} is out of bounds!");
             return;
         }
-        if (grid[oldX, oldY] == null)
+        if (CharacterGrid[oldX, oldY] == null)
         {
             Console.WriteLine($"nothing to move on position: {oldX},{oldY}");
             return;
         }
 
-        if (grid[oldX, oldY] != null)
+        if (CharacterGrid[oldX, oldY] != null)
         {
-            grid[newX, newY] = grid[oldX, oldY];
-            grid[oldX, oldY] = null;
+            CharacterGrid[newX, newY] = CharacterGrid[oldX, oldY];
+            CharacterGrid[oldX, oldY] = null;
         }
 
         DrawGrid();
@@ -72,20 +72,20 @@ public class Grid
     {
         Console.Clear();
         //add initinal line
-        for (int i = 0; i < grid.GetLength(0); i++)
+        for (int i = 0; i < CharacterGrid.GetLength(0); i++)
         {
             Console.Write("___________");
         }
         Console.Write('\n');
 
-        for (int y = 0; y < grid.GetLength(1); y++)
+        for (int y = 0; y < CharacterGrid.GetLength(1); y++)
         {
             for (int i = 0; i < _objectFields.Length; i++)
             {
-                for (int x = 0; x < grid.GetLength(0); x++)
+                for (int x = 0; x < CharacterGrid.GetLength(0); x++)
                 {
-                    if (grid[y, x] != null)
-                        Console.Write(grid[y, x].GetGridData()[i]);
+                    if (CharacterGrid[y, x] != null)
+                        Console.Write(CharacterGrid[y, x].GetGridData()[i]);
                     else
                         Console.Write(_objectFields[i]);
                 }
