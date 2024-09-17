@@ -7,9 +7,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameClient", "GameClient.cs
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RESTServer", "..\RESTServer\RESTServer.csproj", "{94A3CBA1-65B0-472E-B34A-49C0351974C9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UDPGameServer", "..\UDPGameServer\UDPGameServer.csproj", "{582E92FA-3C41-4FC6-A81E-40CDF87D223C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UDPGameServer", "..\UDPGameServer\UDPGameServer.csproj", "{582E92FA-3C41-4FC6-A81E-40CDF87D223C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatClient", "..\ChatClient\ChatClient.csproj", "{26C6B8F8-49C0-4A90-B59A-CA6C23C0182C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ChatClient", "..\ChatClient\ChatClient.csproj", "{26C6B8F8-49C0-4A90-B59A-CA6C23C0182C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TCP", "..\TCP\TCP.csproj", "{15A15492-BB90-4A9B-ACAC-0DA13DC506DF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{26C6B8F8-49C0-4A90-B59A-CA6C23C0182C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{26C6B8F8-49C0-4A90-B59A-CA6C23C0182C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{26C6B8F8-49C0-4A90-B59A-CA6C23C0182C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{15A15492-BB90-4A9B-ACAC-0DA13DC506DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15A15492-BB90-4A9B-ACAC-0DA13DC506DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15A15492-BB90-4A9B-ACAC-0DA13DC506DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15A15492-BB90-4A9B-ACAC-0DA13DC506DF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
