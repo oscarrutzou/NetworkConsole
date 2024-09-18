@@ -8,6 +8,7 @@ namespace UDPGameServer;
 
 public class ClientData
 {
+    public Guid ClientID {  get; set; } 
     public IPEndPoint IPEndPoint { get; set; }
     public DateTime LastHeartBeat { get; set; }
 }
@@ -16,17 +17,25 @@ public static class UDPServerMain
 {
     static int _gridX = 5;
     static int _gridY = 5;
-    static int _maxAmountOfPlayers = 1;
+    static int _maxAmountOfPlayers = 2;
     static Grid _gameGrid;
 
 
     static UdpClient udpServer = new UdpClient(1234);
-    static Dictionary<int, ClientData> Clients = new();
+    static Dictionary<int, ClientData> Clients;
     private static Random _rnd = new();
     private static int _turnNmb;
+    private static ClientData _currentTurnClientData;
+
+    static RequestMovePosMsg? _requestMovePosMsg;
+    static readonly object _clientLock = new object();
+    static readonly object _moveRequestLock = new object();
+
+    static float TargetFPS = 60; // 
 
     public static void Main(string[] args)
     {
+        Clients = new();
         // Thread that deletes clients if they have lost connection
         Thread heartBeatDeleteWhenOffline = new Thread(HeartBeatDeleteWhenOffline);
         heartBeatDeleteWhenOffline.IsBackground = true;
@@ -57,8 +66,13 @@ public static class UDPServerMain
                         // Add endpoint to a List
                         if (!Clients.Any(c => c.Value.IPEndPoint.Equals(remoteEndPoint)) && Clients.Count < _maxAmountOfPlayers)
                         {
-                            Clients.Add(Clients.Count, new ClientData { IPEndPoint = remoteEndPoint, LastHeartBeat = DateTime.Now });
-                            Console.WriteLine($"NEW: {remoteEndPoint} joined");
+                            ClientData data = new ClientData { IPEndPoint = remoteEndPoint, LastHeartBeat = DateTime.Now, ClientID = Guid.NewGuid() };
+                            Clients.Add(Clients.Count, data);
+                            string welcome = $"NEW CLIENT: {remoteEndPoint}:: ID: {data.ClientID}";
+                            Console.WriteLine(welcome);
+                            
+                            ServerMsg serverMsgWelcom = new ServerMsg() { Message = "Welcome to " + welcome};
+                            RelayMessageToAllUser(serverMsgWelcom);
                         }
                         break;
 
@@ -68,7 +82,7 @@ public static class UDPServerMain
 
                         if (client.Equals(default(KeyValuePair<int, ClientData>)))
                         {
-                            Console.WriteLine($"ERROR: Client {remoteEndPoint} not found in the list.");
+                            Console.WriteLine($"HeartBeat ERROR: Client {remoteEndPoint} not found in the list.");
                             break;
                         }
 
@@ -78,10 +92,21 @@ public static class UDPServerMain
 
                     case MessageType.RequestMovePosition:
 
-                        _requestMovePosMsg = MessagePackSerializer.Deserialize<RequestMovePosMsg>(dataToDeserialize);
-                        //lock (_moveRequestLock)
-                        //{
-                        //}
+                        var senderClient = Clients.FirstOrDefault(c => c.Value.IPEndPoint.Equals(remoteEndPoint));
+                        if (senderClient.Equals(default(KeyValuePair<int, ClientData>)))
+                        {
+                            Console.WriteLine($"RequestMovePosition ERROR: Client {remoteEndPoint} not found in the list.");
+                            break;
+                        }
+
+                        lock (_moveRequestLock)
+                        {
+                            if (senderClient.Value.ClientID == _currentTurnClientData.ClientID)
+                            {
+                                // Only take the request if its their turn
+                                _requestMovePosMsg = MessagePackSerializer.Deserialize<RequestMovePosMsg>(dataToDeserialize);
+                            }
+                        }
                         break;
 
                     case MessageType.ServerMsg:
@@ -97,9 +122,7 @@ public static class UDPServerMain
         }
     }
 
-    static RequestMovePosMsg? _requestMovePosMsg;
-    static object _clientLock = new object();
-    static object _moveRequestLock { get; set; } = new object();
+
     // Ask for turns
     // Give aceess so the first client can change pos
     // Say to the other client whos turn it is. 
@@ -110,77 +133,57 @@ public static class UDPServerMain
         bool first = false;
         while (true)
         {
-            lock (_clientLock)
+            Thread.Sleep(50);
+            // Take time for it to be done, then turn sleep time up or down.
+
+            //lock (_clientLock)
+            //{
+            if (Clients.Count != _maxAmountOfPlayers) continue;
+            if (!first)
             {
-                if (Clients.Count != _maxAmountOfPlayers) continue;
-                if (!first)
+                first = true;
+                _turnNmb = 0;
+                _currentTurnClientData = Clients[_turnNmb];
+                StartGame();
+                continue;
+            }
+
+            bool haveMoved = false;
+            
+            while (!haveMoved)
+            {
+                lock (_moveRequestLock)
                 {
-                    first = true;
-                    _turnNmb = 0;
-                    StartGame();
-                    continue;
-                }
+                    if (_requestMovePosMsg == null) continue;
 
-                //Make a base response for the current turn user, and otherwise its a waiting turn.
+                    // Check the move data
+                    // If the msg is not a valid pos, continue;
+                    // Handle dmg and updated grid.
+                    // Send new data before change turn.
+                    // client has to wait for the updated grid, before its their turn.
 
-                string othersResponseMessage = $"Its {_turnNmb} turn...";
-                byte[] othersResponseData = Encoding.ASCII.GetBytes(othersResponseMessage);
+                    Point prevPos = _requestMovePosMsg.PrevPos;
+                    Point newTargetPoint = _requestMovePosMsg.NewTargetPos;
 
-                string responseMessage = $"Its your turn...";
-                byte[] responseData = Encoding.ASCII.GetBytes(responseMessage);
+                    TryMoveData tryMoveData = _gameGrid.TryMoveObject(prevPos, newTargetPoint);
 
-                TurnMsg turnMsg;
-                for (int i = 0; i < Clients.Count; i++)
-                {
-                    if (i == _turnNmb)
-                        turnMsg = new TurnMsg() { Message = responseMessage };
-                    else
-                        turnMsg = new TurnMsg() { Message = othersResponseMessage };
-                    
-                    SendMessage(turnMsg, Clients[i].IPEndPoint);
-                }
-
-                // Uses a temporary variable for the IPEndPoint
-                IPEndPoint tempEndPoint = Clients[_turnNmb].IPEndPoint;
-                
-                bool haveMoved = false;
-                while (!haveMoved)
-                {
-                    lock (_moveRequestLock)
+                    if (tryMoveData.HasMoved)
                     {
-                        if (_requestMovePosMsg == null) continue;
-
-                        // Check the move data
-                        // If the msg is not a valid pos, continue;
-                        // Handle dmg and updated grid.
-                        // Send new data before change turn.
-                        // client has to wait for the updated grid, before its their turn.
-
-                        Point prevPos = _requestMovePosMsg.PrevPos;
-                        Point newTargetPoint = _requestMovePosMsg.NewTargetPos;
-                        
-                        TryMoveData tryMoveData = _gameGrid.TryMoveObject(prevPos, newTargetPoint);
-
-                        if (tryMoveData.HasMoved)
-                        {
-                            Console.WriteLine(tryMoveData.ReturnMsg);
-                            haveMoved = true;
-                            _gameGrid.MoveObject(prevPos.X, prevPos.Y, newTargetPoint.X, newTargetPoint.Y);
-                        }
-
-                        ServerMsg serverMsg = new ServerMsg() { Message = tryMoveData.ReturnMsg };
-                        SendMessage(serverMsg, tempEndPoint);
-                        _requestMovePosMsg = null;
+                        Console.WriteLine($"User {_turnNmb}: {tryMoveData.ReturnMsg}");
+                        haveMoved = true;
                     }
 
-                    UpdateGrid();
-                    Thread.Sleep(500);
+                    ServerMsg serverMsg = new ServerMsg() { Message = tryMoveData.ReturnMsg };
+                    SendMessage(serverMsg, _currentTurnClientData.IPEndPoint);
+                    _requestMovePosMsg = null;
                 }
-
-                ChangeTurn();
             }
+
+            ChangeTurn();
         }
+        //}
     }
+
     static byte[] SendMessage(NetworkMessage message, IPEndPoint endPoint)
     {
         byte[] messageBytes = new byte[1024];
@@ -211,15 +214,29 @@ public static class UDPServerMain
 
         return combinedBytes;
     }
-    
+
+    static void SendRepeatMessage(byte[] combinedBytes, IPEndPoint endPoint)
+    {
+        udpServer.Send(combinedBytes, endPoint);
+    }
+
+    static void RelayMessageToAllUser(NetworkMessage message)
+    {
+        byte[] combinedMsg = null;
+        for (int i = 0; i < Clients.Count; i++)
+        {
+            IPEndPoint _clientEndPoint = Clients[i].IPEndPoint;
+            if (combinedMsg == null)
+                combinedMsg = SendMessage(message, _clientEndPoint);
+            else
+                SendRepeatMessage(combinedMsg, _clientEndPoint);
+        }
+    }
+
     static void StartGame()
     {
-        Console.Clear();
+        //Console.Clear();
         Console.WriteLine($"Started game with {Clients.Count} players");
-       
-        // Make world
-        // Sets players
-        // Sends full data to players (full grid)
 
         _gameGrid = new Grid(_gridX, _gridY);
 
@@ -234,7 +251,7 @@ public static class UDPServerMain
                 if (_gameGrid.CharacterGrid[x, y] != null) continue;
                 hasFoundSpot = true;
 
-                Character player = new Character(i, new Point(x, y), $"Bob {i}", CharacterType.Warrior, 10, 5);
+                Character player = new Character(i, new Point(x, y), $"Bob {i}", CharacterType.Warrior, 5, 10);
                 _gameGrid.AddObject(player, x, y);
             }
         }
@@ -242,20 +259,42 @@ public static class UDPServerMain
         UpdateGrid();
     }
 
+
     static void UpdateGrid()
     {
+        SendTurnMsg();
+
         UpdateGridMsg updateGrid = new UpdateGridMsg() { GameGridArray = _gameGrid.CharacterGrid, GridSize = _gameGrid.GridSize };
 
+        RelayMessageToAllUser(updateGrid);
+    }
+
+    static void SendTurnMsg()
+    {
+        //Make a base response for the current turn user, and otherwise its a waiting turn.
+        string othersResponseMessage = $"Its {_turnNmb} turn...";
+        byte[] othersResponseData = Encoding.ASCII.GetBytes(othersResponseMessage);
+
+        string responseMessage = $"Its your turn...";
+        byte[] responseData = Encoding.ASCII.GetBytes(responseMessage);
+
+        TurnMsg turnMsg;
         for (int i = 0; i < Clients.Count; i++)
         {
-            IPEndPoint _clientEndPoint = Clients[i].IPEndPoint;
-            SendMessage(updateGrid, _clientEndPoint);
+            if (i == _turnNmb)
+                turnMsg = new TurnMsg() { Message = responseMessage };
+            else
+                turnMsg = new TurnMsg() { Message = othersResponseMessage };
+
+            SendMessage(turnMsg, Clients[i].IPEndPoint);
         }
     }
 
     static void ChangeTurn()
     {
         _turnNmb = (_turnNmb + 1) % _maxAmountOfPlayers;
+        _currentTurnClientData = Clients[_turnNmb];
+        UpdateGrid();
     }
 
     static void HeartBeatDeleteWhenOffline()

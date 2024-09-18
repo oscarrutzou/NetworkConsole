@@ -15,19 +15,17 @@ public static class GameClientMain
     private static IPAddress _serverIP = IPAddress.Parse("127.0.0.1"); // Lokal IP, men kunne også være en IP på en server
     private static int _serverPort = 1234;
     private static IPEndPoint _endPoint;
-    private static IPEndPoint _serverEndPoint;
 
     private static Grid _localGameGrid;
     private static string _turnMsg = "";
 
-    private static readonly object _writeLock = new object();
+    private static object _writeLock = new object();
     #endregion
 
     public static void Main(string[] args)
     {
         // Send start msg
         _endPoint = new IPEndPoint(_serverIP, _serverPort);
-        _serverEndPoint = new IPEndPoint(_serverIP, _serverPort);
 
         Thread heartbeatThread = new Thread(HeartBeatMessage);
         heartbeatThread.IsBackground = true;
@@ -45,7 +43,16 @@ public static class GameClientMain
         RequestAddClientMsg requestAddClientMsg = new RequestAddClientMsg();
         SendMessage(requestAddClientMsg, _endPoint);
     }
-    
+    static void DrawGrid()
+    {
+        Console.Write("\x1b[3J"); // Clear the scrollback buffer
+        Console.Clear();
+        _localGameGrid.DrawGrid();
+        Console.WriteLine("DRAWING GRID");
+
+        Console.WriteLine(_turnMsg);
+        Console.WriteLine("UPDATE Write the old input {X,Y} {NewX,NewY}:");
+    }
     static void Update()
     {
         string pattern = @"^\d+\s+\d+\s+\d+\s+\d+$";
@@ -55,13 +62,10 @@ public static class GameClientMain
             try
             {
                 if (_localGameGrid == null) continue;
+
                 lock (_writeLock)
                 {
-                    Console.Clear();
-                    _localGameGrid.DrawGrid();
-
-                    Console.WriteLine(_turnMsg);
-                    Console.WriteLine("\nWrite the old input {X,Y} {NewX,NewY}:");
+                    DrawGrid();
                 }
 
                 string input = Console.ReadLine();
@@ -75,7 +79,6 @@ public static class GameClientMain
 
                 RequestMovePosMsg requestMovePosMsg = new RequestMovePosMsg() { PrevPos = new Point(numbers[0], numbers[1]), NewTargetPos = new Point(numbers[2], numbers[3]) };
                 SendMessage(requestMovePosMsg, _endPoint);
-
             }
             catch (Exception ex)
             {
@@ -123,15 +126,12 @@ public static class GameClientMain
 
                     case MessageType.UpdateGrid:
                         UpdateGridMsg updateMsg = MessagePackSerializer.Deserialize<UpdateGridMsg>(dataToDeserialize);
-                        _localGameGrid = new Grid(updateMsg.GridSize.X, updateMsg.GridSize.Y);
-                        _localGameGrid.CharacterGrid = updateMsg.GameGridArray;
+
                         lock (_writeLock)
                         {
-                            Console.Clear();
-                            _localGameGrid.DrawGrid();
-
-                            Console.WriteLine(_turnMsg);
-                            Console.WriteLine("\nWrite the old input {X,Y} {NewX,NewY}:");
+                            _localGameGrid = new Grid(updateMsg.GridSize.X, updateMsg.GridSize.Y);
+                            _localGameGrid.CharacterGrid = updateMsg.GameGridArray;
+                            DrawGrid();
                         }
 
                         break;
@@ -139,6 +139,13 @@ public static class GameClientMain
                     case MessageType.TurnMsg:
                         TurnMsg turnMsg = MessagePackSerializer.Deserialize<TurnMsg>(dataToDeserialize);
                         _turnMsg = turnMsg.Message;
+
+                        lock (_writeLock)
+                        {
+                            if (_localGameGrid == null) break;
+                            DrawGrid();
+                        }
+
                         break;
 
                     case MessageType.ServerMsg:
@@ -146,17 +153,17 @@ public static class GameClientMain
 
                         lock (_writeLock)
                         {
-                            Console.WriteLine($"Server wide msg: {serverMsg.Message}");
+                            Console.WriteLine($"Server msg: {serverMsg.Message}");
                         }
                         break;
                 }
             }
             catch (Exception ex)
             {
-                lock (_writeLock)
-                {
-                    Console.WriteLine($"Receive Exception: {ex.Message}");
-                }
+                //Console.WriteLine($"Receive Exception: {ex.Message}");
+                //lock (_writeLock)
+                //{
+                //}
             }
         }
     }

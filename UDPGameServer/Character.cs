@@ -58,8 +58,32 @@ public class Character
             $"|{CharacterType}".PadRight(15,' '),
             $"|HP: {CurrentHealth}/{MaxHealth}".PadRight(15,' '),
             $"|Attack: {Damage}".PadRight(15,' '),
-            "",
+            "|              ",
             "|______________"
         ];
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="damage"></param>
+    /// <returns>False = dead, True = alive</returns>
+    public bool TakeDamage(int damage)
+    {
+        if (CurrentHealth - damage > 0)
+        {
+            CurrentHealth -= damage;
+            return true;
+        }
+        else
+        {
+            CurrentHealth = 0;
+            return false;
+        }
+    }
+
+    public bool DealDamage(Character otherCharacter)
+    {
+        return otherCharacter.TakeDamage(Damage);
     }
 }

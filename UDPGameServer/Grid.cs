@@ -22,7 +22,7 @@ public class Grid
         "|              ",
         "|              ",
         "|              ",
-        "",
+        "|              ",
         "|______________"
     ];
     private static int _indexOfPosition = 4;
@@ -37,53 +37,16 @@ public class Grid
         CharacterGrid[x, y] = character;
     }
 
-    public void MoveObject(int oldX, int oldY, int newX, int newY)
-    {
-        if (oldX > CharacterGrid.GetLength(0))
-        {
-            Console.WriteLine($"first input {oldX} is out of bounds!");
-            return;
-        }
-        if (oldY > CharacterGrid.GetLength(1))
-        {
-            Console.WriteLine($"second input{oldY} is out of bounds!");
-            return;
-        }
-        if (newX > CharacterGrid.GetLength(0))
-        {
-            Console.WriteLine($"third input{newX} is out of bounds!");
-            return;
-        }
-        if (newY > CharacterGrid.GetLength(0))
-        {
-            Console.WriteLine($"fourth input{newY} is out of bounds!");
-            return;
-        }
-        if (CharacterGrid[oldX, oldY] == null)
-        {
-            Console.WriteLine($"nothing to move on position: {oldX},{oldY}");
-            return;
-        }
-
-        if (CharacterGrid[oldX, oldY] != null)
-        {
-            CharacterGrid[newX, newY] = CharacterGrid[oldX, oldY];
-            CharacterGrid[oldX, oldY] = null;
-        }
-
-        DrawGrid();
-    }
-
     public TryMoveData TryMoveObject(Point prevPos, Point newTargetPos)
     {
         TryMoveData tryMoveData = new TryMoveData() { HasMoved = false, ReturnMsg = "" };
 
-        if (prevPos.X > CharacterGrid.GetLength(0) || prevPos.Y > CharacterGrid.GetLength(1))
+        if (prevPos.X >= CharacterGrid.GetLength(0) || prevPos.Y >= CharacterGrid.GetLength(1))
         {
             tryMoveData.ReturnMsg = $"Prev pos is out of bounds!";
             return tryMoveData;
         }
-        if (newTargetPos.X > CharacterGrid.GetLength(0) || newTargetPos.Y > CharacterGrid.GetLength(1))
+        if (newTargetPos.X >= CharacterGrid.GetLength(0) || newTargetPos.Y >= CharacterGrid.GetLength(1))
         {
             tryMoveData.ReturnMsg = $"New target pos is out of bounds!";
             return tryMoveData;
@@ -95,28 +58,46 @@ public class Grid
             return tryMoveData;
         }
 
-        if (CharacterGrid[prevPos.X, prevPos.Y] != null)
+        if (CharacterGrid[prevPos.X, prevPos.Y] != null && CharacterGrid[newTargetPos.X, newTargetPos.Y] == null)
         {
             CharacterGrid[newTargetPos.X, newTargetPos.Y] = CharacterGrid[prevPos.X, prevPos.Y];
             CharacterGrid[prevPos.X, prevPos.Y] = null;
+            tryMoveData.ReturnMsg = $"Have moved from :{prevPos.X},{prevPos.Y}  to: {newTargetPos.X},{newTargetPos.Y}";
+            
             tryMoveData.HasMoved = true;
         }
+        else if (CharacterGrid[prevPos.X, prevPos.Y] != null && CharacterGrid[newTargetPos.X, newTargetPos.Y] != null)
+        {
+            // Grid deal damage to other character
+            Character movingCharacter = CharacterGrid[prevPos.X, prevPos.Y];
+            Character targetCharacter = CharacterGrid[newTargetPos.X, newTargetPos.Y];
+            int dmg = movingCharacter.Damage;
 
-        tryMoveData.ReturnMsg = $"Have moved from :{prevPos.X},{prevPos.Y}  to: {newTargetPos.X},{newTargetPos.Y}";
+            tryMoveData.ReturnMsg = $"Has dealth {dmg} to {targetCharacter.Name}";
+            bool isStillAlive = movingCharacter.DealDamage(targetCharacter);
+
+            if (!isStillAlive)
+            {
+                CharacterGrid[newTargetPos.X, newTargetPos.Y] = CharacterGrid[prevPos.X, prevPos.Y];
+                CharacterGrid[prevPos.X, prevPos.Y] = null;
+                tryMoveData.HasMoved = true;
+
+                tryMoveData.ReturnMsg += $"Has killed enemy {targetCharacter.Name} with {targetCharacter.Name}";
+            }
+        }
+
         return tryMoveData;
     }
 
     public void DrawGrid()
     {
-        Console.Clear();
-
-        //add initinal line
+        //Add the initinal line
         for (int i = 0; i < CharacterGrid.GetLength(0); i++)
         {
             Console.Write("_______________");
         }
-        
-        Console.Write('\n');
+
+        Console.Write("\n");
 
         for (int y = 0; y < CharacterGrid.GetLength(1); y++)
         {
@@ -152,3 +133,39 @@ public struct TryMoveData
     public bool HasMoved { get; set; }
     public string ReturnMsg { get; set; }
 }
+
+/*
+ *         StringBuilder sb = new StringBuilder();
+        //add initinal line
+        for (int i = 0; i < CharacterGrid.GetLength(0); i++)
+        {
+            sb.Append("_______________");
+        }
+
+        sb.Append('\n');
+
+        for (int y = 0; y < CharacterGrid.GetLength(1); y++)
+        {
+            for (int i = 0; i < _emptyCharaterFields.Length; i++)
+            {
+                for (int x = 0; x < CharacterGrid.GetLength(0); x++)
+                {
+                    if (i == _indexOfPosition)
+                    {
+                        sb.Append("|" + $"{y},{x}".PadLeft(14, ' '));
+                    }
+                    else
+                    {
+                        if (CharacterGrid[x, y] != null)
+                            sb.Append(CharacterGrid[x, y].GetGridData()[i]);
+                        else
+                            sb.Append(_emptyCharaterFields[i]);
+                    }
+                }
+                sb.AppendLine("|");
+            }
+        }
+
+        Console.WriteLine(sb.ToString());
+    }
+ */
