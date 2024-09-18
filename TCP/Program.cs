@@ -9,7 +9,7 @@ namespace TCP
         {
             TcpListener server = new TcpListener(IPAddress.Any, 12345);
             server.Start();
-            Console.WriteLine("...");
+            Console.WriteLine("Awaiting client connection");
             while (true)
             {
                 TcpClient client = server.AcceptTcpClient();
@@ -66,6 +66,8 @@ namespace TCP
             {
                 Console.WriteLine($"{clientId} has disconnected.");
 
+                var searchedClient = clients.First(x => x.tcpClient == client);
+                clients.Remove(searchedClient);
                 client.Dispose();
                 RelayMessage(clientId, "server ", $"{cliData.name} has abandoned the cause.");
             }
@@ -75,6 +77,7 @@ namespace TCP
         {
             for (int i = 0; i < clients.Count; i++)
             {
+                
                 if (clientID != clients[i].id)
                 {
                     StreamWriter writer = new StreamWriter(clients[i].tcpClient.GetStream());
