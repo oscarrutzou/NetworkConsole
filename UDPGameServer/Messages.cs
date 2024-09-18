@@ -9,10 +9,13 @@ namespace UDPGameServer;
 
 public enum MessageType
 {
+    RequestAddClient,
     StartGame,
     HeartBeat,
-    MovePosition,
+    RequestMovePosition,
     ServerMsg,
+    TurnMsg,
+    UpdateGrid,
 }
 
 
@@ -28,10 +31,19 @@ public abstract class NetworkMessage
     }
 }
 
-public class StartGame : NetworkMessage
+public class StartGameMsg : NetworkMessage
 {
     [IgnoreMember]
     public override MessageType MessageType => MessageType.StartGame;
+}
+
+public class TurnMsg : NetworkMessage
+{
+    [Key(0)]
+    public string Message;
+
+    [IgnoreMember]
+    public override MessageType MessageType => MessageType.TurnMsg;
 }
 
 public class ServerMsg : NetworkMessage
@@ -41,6 +53,43 @@ public class ServerMsg : NetworkMessage
 
     [IgnoreMember]
     public override MessageType MessageType => MessageType.ServerMsg;
+}
+
+public class RequestAddClientMsg : NetworkMessage
+{
+    [IgnoreMember]
+    public override MessageType MessageType => MessageType.RequestAddClient;
+}
+
+
+public class HeartBeatMsg : NetworkMessage
+{
+    [IgnoreMember]
+    public override MessageType MessageType => MessageType.HeartBeat;
+}
+
+public class RequestMovePosMsg : NetworkMessage
+{
+    [Key(0)]
+    public Point PrevPos;
+
+    [Key(1)]
+    public Point NewTargetPos;
+
+    [IgnoreMember]
+    public override MessageType MessageType => MessageType.RequestMovePosition;
+}
+
+public class UpdateGridMsg : NetworkMessage
+{
+    [Key(0)]
+    public Character[,] GameGridArray { get; set; }
+
+    [Key(1)]
+    public Point GridSize { get; set; }
+
+    [IgnoreMember]
+    public override MessageType MessageType => MessageType.UpdateGrid;
 }
 
 // Grid

@@ -37,47 +37,7 @@ public static class UDPServerMain
         gameLoop.IsBackground = true;
         gameLoop.Start();
 
-        HeartBeatListener();
-    }
-
-    /// <summary>
-    /// Checks the heart beat and adds new clients to a dictionary
-    /// </summary>
-    static void HeartBeatListener()
-    {
-        while (true)
-        {
-            IPEndPoint clientEndPoint = new IPEndPoint(IPAddress.Any, 0);
-
-            byte[] receivedData = udpServer.Receive(ref clientEndPoint);
-            // Take a message insted...
-            string receivedMessage = Encoding.ASCII.GetString(receivedData);
-
-            // Add endpoint to a List
-            if (!Clients.Any(c => c.Value.IPEndPoint.Equals(clientEndPoint)) && Clients.Count < _maxAmountOfPlayers)
-            {
-                Clients.Add(Clients.Count, new ClientData { IPEndPoint = clientEndPoint, LastHeartBeat = DateTime.Now });
-                Console.WriteLine($"NEW: {clientEndPoint} joined");
-            }
-            
-            // Check if the client is in the list
-            var client = Clients.FirstOrDefault(c => c.Value.IPEndPoint.Equals(clientEndPoint));
-            
-            if (client.Equals(default(KeyValuePair<int, ClientData>)))
-            {
-                Console.WriteLine($"ERROR: Client {clientEndPoint} not found in the list.");
-                continue;
-            }
-
-            int clientIndex = client.Key;
-
-            if (receivedMessage == HeartBeatMsg)
-            {
-                // Update the LastHeartBeat time
-                Clients[clientIndex].LastHeartBeat = DateTime.Now;
-                continue;
-            }
-        }
+        ReceiveMessages();
     }
 
     static void ReceiveMessages()
@@ -93,13 +53,35 @@ public static class UDPServerMain
 
                 switch (messageType)
                 {
-                    case MessageType.StartGame:
+                    case MessageType.RequestAddClient:
+                        // Add endpoint to a List
+                        if (!Clients.Any(c => c.Value.IPEndPoint.Equals(remoteEndPoint)) && Clients.Count < _maxAmountOfPlayers)
+                        {
+                            Clients.Add(Clients.Count, new ClientData { IPEndPoint = remoteEndPoint, LastHeartBeat = DateTime.Now });
+                            Console.WriteLine($"NEW: {remoteEndPoint} joined");
+                        }
                         break;
 
                     case MessageType.HeartBeat:
+                        // Check if the client is in the list
+                        var client = Clients.FirstOrDefault(c => c.Value.IPEndPoint.Equals(remoteEndPoint));
+
+                        if (client.Equals(default(KeyValuePair<int, ClientData>)))
+                        {
+                            Console.WriteLine($"ERROR: Client {remoteEndPoint} not found in the list.");
+                            break;
+                        }
+
+                        int clientIndex = client.Key;
+                        Clients[clientIndex].LastHeartBeat = DateTime.Now;
                         break;
 
-                    case MessageType.MovePosition:
+                    case MessageType.RequestMovePosition:
+
+                        _requestMovePosMsg = MessagePackSerializer.Deserialize<RequestMovePosMsg>(dataToDeserialize);
+                        //lock (_moveRequestLock)
+                        //{
+                        //}
                         break;
 
                     case MessageType.ServerMsg:
@@ -110,13 +92,14 @@ public static class UDPServerMain
             }
             catch (Exception ex)
             {
-                //Console.WriteLine($"Receive Exception: {ex.Message}");
+                Console.WriteLine($"Receive Exception: {ex.Message}");
             }
         }
     }
 
-    public static readonly string HeartBeatMsg = "heartbeat";
+    static RequestMovePosMsg? _requestMovePosMsg;
     static object _clientLock = new object();
+    static object _moveRequestLock { get; set; } = new object();
     // Ask for turns
     // Give aceess so the first client can change pos
     // Say to the other client whos turn it is. 
@@ -146,38 +129,59 @@ public static class UDPServerMain
                 string responseMessage = $"Its your turn...";
                 byte[] responseData = Encoding.ASCII.GetBytes(responseMessage);
 
-                ServerMsg serverMsg;
+                TurnMsg turnMsg;
                 for (int i = 0; i < Clients.Count; i++)
                 {
                     if (i == _turnNmb)
-                        serverMsg = new ServerMsg() { Message = responseMessage };
+                        turnMsg = new TurnMsg() { Message = responseMessage };
                     else
-                        serverMsg = new ServerMsg() { Message = othersResponseMessage };
+                        turnMsg = new TurnMsg() { Message = othersResponseMessage };
                     
-                    SendMessage(serverMsg, Clients[i].IPEndPoint);
+                    SendMessage(turnMsg, Clients[i].IPEndPoint);
                 }
 
                 // Uses a temporary variable for the IPEndPoint
                 IPEndPoint tempEndPoint = Clients[_turnNmb].IPEndPoint;
                 
-                bool hasRecivedNewPos = false;
-                while (!hasRecivedNewPos)
+                bool haveMoved = false;
+                while (!haveMoved)
                 {
-                    byte[] receivedData = udpServer.Receive(ref tempEndPoint);
-                    string receivedMessage = Encoding.ASCII.GetString(receivedData);
+                    lock (_moveRequestLock)
+                    {
+                        if (_requestMovePosMsg == null) continue;
 
-                    if (receivedMessage == HeartBeatMsg) continue;
-                    // If the msg is not a valid pos, continue;
+                        // Check the move data
+                        // If the msg is not a valid pos, continue;
+                        // Handle dmg and updated grid.
+                        // Send new data before change turn.
+                        // client has to wait for the updated grid, before its their turn.
 
-                    Console.WriteLine($"Svar fra serveren: {receivedMessage} på adresse: {Clients[_turnNmb].IPEndPoint}");
-                    hasRecivedNewPos = true;
+                        Point prevPos = _requestMovePosMsg.PrevPos;
+                        Point newTargetPoint = _requestMovePosMsg.NewTargetPos;
+                        
+                        TryMoveData tryMoveData = _gameGrid.TryMoveObject(prevPos, newTargetPoint);
+
+                        if (tryMoveData.HasMoved)
+                        {
+                            Console.WriteLine(tryMoveData.ReturnMsg);
+                            haveMoved = true;
+                            _gameGrid.MoveObject(prevPos.X, prevPos.Y, newTargetPoint.X, newTargetPoint.Y);
+                        }
+
+                        ServerMsg serverMsg = new ServerMsg() { Message = tryMoveData.ReturnMsg };
+                        SendMessage(serverMsg, tempEndPoint);
+                        _requestMovePosMsg = null;
+                    }
+
+                    UpdateGrid();
+                    Thread.Sleep(500);
                 }
 
-                //ChangeTurn();
+                ChangeTurn();
             }
         }
     }
-    static void SendMessage(NetworkMessage message, IPEndPoint endPoint)
+    static byte[] SendMessage(NetworkMessage message, IPEndPoint endPoint)
     {
         byte[] messageBytes = new byte[1024];
         byte messageTypeByte = message.GetMessageTypeAsByte;
@@ -185,7 +189,13 @@ public static class UDPServerMain
         switch (message.MessageType)
         {
             case MessageType.StartGame:
-                messageBytes = MessagePackSerializer.Serialize((StartGame)message);
+                messageBytes = MessagePackSerializer.Serialize((StartGameMsg)message);
+                break;
+            case MessageType.UpdateGrid:
+                messageBytes = MessagePackSerializer.Serialize((UpdateGridMsg)message);
+                break;
+            case MessageType.TurnMsg:
+                messageBytes = MessagePackSerializer.Serialize((TurnMsg)message);
                 break;
             case MessageType.ServerMsg:
                 messageBytes = MessagePackSerializer.Serialize((ServerMsg)message);
@@ -198,12 +208,15 @@ public static class UDPServerMain
         combinedBytes[0] = messageTypeByte;
         Buffer.BlockCopy(messageBytes, 0, combinedBytes, 1, messageBytes.Length);
         udpServer.Send(combinedBytes, endPoint);
-    }
 
+        return combinedBytes;
+    }
+    
     static void StartGame()
     {
         Console.Clear();
         Console.WriteLine($"Started game with {Clients.Count} players");
+       
         // Make world
         // Sets players
         // Sends full data to players (full grid)
@@ -226,7 +239,18 @@ public static class UDPServerMain
             }
         }
 
-        _gameGrid.DrawGrid();
+        UpdateGrid();
+    }
+
+    static void UpdateGrid()
+    {
+        UpdateGridMsg updateGrid = new UpdateGridMsg() { GameGridArray = _gameGrid.CharacterGrid, GridSize = _gameGrid.GridSize };
+
+        for (int i = 0; i < Clients.Count; i++)
+        {
+            IPEndPoint _clientEndPoint = Clients[i].IPEndPoint;
+            SendMessage(updateGrid, _clientEndPoint);
+        }
     }
 
     static void ChangeTurn()
@@ -271,21 +295,4 @@ public static class UDPServerMain
         // Removes all clients
         // Stop the game client + chat client.
     }
-
-
-
-
-    // When there is 2 clients we stop reciving clients.
-    //Console.WriteLine($"Modtaget: {receivedMessage} fra {clientEndPoint}");
-
-
-
-    // Answer from server!
-    //byte[] receivedData = _udpClient.Receive(ref _endPoint);
-    //string receivedMessage = Encoding.ASCII.GetString(receivedData);
-    //Console.WriteLine($"Svar fra serveren: {receivedMessage} på adresse: {_endPoint}");
-
-    //string responseMessage = "Tak for beskeden!";
-    //byte[] responseData = Encoding.ASCII.GetBytes(responseMessage);
-    //udpServer.Send(responseData, clientEndPoint);
 }

@@ -54,11 +54,12 @@ public class Character
     {
         return
         [
-            $"|Owner: {OwnerID}".PadRight(11,' '),
-            $"|{CharacterType}".PadRight(11,' '),
-            $"|HP: {CurrentHealth}/{MaxHealth}".PadRight(11,' '),
-            $"|Attack: {Damage}".PadRight(11,' '),
-            "|__________"
+            $"|Owner: {OwnerID}".PadRight(15,' '),
+            $"|{CharacterType}".PadRight(15,' '),
+            $"|HP: {CurrentHealth}/{MaxHealth}".PadRight(15,' '),
+            $"|Attack: {Damage}".PadRight(15,' '),
+            "",
+            "|______________"
         ];
     }
 }
