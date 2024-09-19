@@ -28,7 +28,8 @@ namespace RESTServer
         [HttpPost]
         public IActionResult Post([FromBody] PostTest post)
         {
-            return Ok(_log += post.mess + "\n");
+            _log += ($"{post.name}: {post.mess} \n");
+            return Ok(_log);
         }
 
         //string apiUrl = "https://localhost:7019/LogChat/";

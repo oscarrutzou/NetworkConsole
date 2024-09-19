@@ -53,10 +53,7 @@ namespace TCP
                             }
                             else if (message == "!Log")
                             {
-                                 GetMessage(cliData);
-                                
-                                
-
+                                GetMessage(cliData);
                                                             
                             }
                             else
@@ -148,11 +145,11 @@ namespace TCP
                 string responseContent = await response.Content.ReadAsStringAsync();
 
                 StreamWriter writer = new StreamWriter(requester.tcpClient.GetStream());
-                writer.Flush();
-                writer.WriteLine("Server Log: \n" + responseContent);
+                
+                writer.WriteLine($"Server Log: \n {responseContent}" );
                 writer.Flush();
                 
-                Console.WriteLine($"Log Data send to: {requester.name}: {responseContent}");
+                Console.WriteLine($"Log Data send to: /*{requester.name}*/: {responseContent}");
             }
             else
             {
