@@ -37,7 +37,7 @@ public class Grid
         CharacterGrid[x, y] = character;
     }
 
-    public TryMoveData TryMoveObject(Point prevPos, Point newTargetPos)
+    public TryMoveData TryMoveObject(Point prevPos, Point newTargetPos, int ownerID)
     {
         TryMoveData tryMoveData = new TryMoveData() { HasMoved = false, ReturnMsg = "" };
 
@@ -58,6 +58,12 @@ public class Grid
             return tryMoveData;
         }
 
+        if (CharacterGrid[prevPos.X, prevPos.Y] != null && CharacterGrid[prevPos.X, prevPos.Y].OwnerID != ownerID)
+        {
+            tryMoveData.ReturnMsg = $"You dont own this hero: {prevPos.X},{prevPos.Y}";
+            return tryMoveData;
+        }
+
         if (CharacterGrid[prevPos.X, prevPos.Y] != null && CharacterGrid[newTargetPos.X, newTargetPos.Y] == null)
         {
             CharacterGrid[newTargetPos.X, newTargetPos.Y] = CharacterGrid[prevPos.X, prevPos.Y];
@@ -69,20 +75,31 @@ public class Grid
         else if (CharacterGrid[prevPos.X, prevPos.Y] != null && CharacterGrid[newTargetPos.X, newTargetPos.Y] != null)
         {
             // Grid deal damage to other character
-            Character movingCharacter = CharacterGrid[prevPos.X, prevPos.Y];
-            Character targetCharacter = CharacterGrid[newTargetPos.X, newTargetPos.Y];
-            int dmg = movingCharacter.Damage;
+            Character attacker = CharacterGrid[prevPos.X, prevPos.Y];
+            Character target = CharacterGrid[newTargetPos.X, newTargetPos.Y];
+            
+            if (attacker.OwnerID == ownerID && target.OwnerID == ownerID)
+            {
+                tryMoveData.ReturnMsg = "Both attacker and target belong to the user...";
+                return tryMoveData;
+            }
 
-            tryMoveData.ReturnMsg = $"Has dealth {dmg} to {targetCharacter.Name}";
-            bool isStillAlive = movingCharacter.DealDamage(targetCharacter);
+            int dmg = attacker.Damage;
 
-            if (!isStillAlive)
+            bool isStillAlive = attacker.DealDamage(target);
+
+            if (isStillAlive)
+            {
+                tryMoveData.ReturnMsg = $"Has dealth {dmg} to {target.Name} with {attacker.Name}";
+                tryMoveData.HasDealtDamage = true;
+            }
+            else
             {
                 CharacterGrid[newTargetPos.X, newTargetPos.Y] = CharacterGrid[prevPos.X, prevPos.Y];
                 CharacterGrid[prevPos.X, prevPos.Y] = null;
                 tryMoveData.HasMoved = true;
 
-                tryMoveData.ReturnMsg += $"Has killed enemy {targetCharacter.Name} with {targetCharacter.Name}";
+                tryMoveData.ReturnMsg = $"Has killed enemy {target.Name} with {attacker.Name}";
             }
         }
 
@@ -131,6 +148,7 @@ public class Grid
 public struct TryMoveData
 {
     public bool HasMoved { get; set; }
+    public bool HasDealtDamage { get; set; }
     public string ReturnMsg { get; set; }
 }
 

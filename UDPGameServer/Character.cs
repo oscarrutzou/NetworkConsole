@@ -55,7 +55,7 @@ public class Character
         return
         [
             $"|Owner: {OwnerID}".PadRight(15,' '),
-            $"|{CharacterType}".PadRight(15,' '),
+            $"|{Name}".PadRight(15,' '),
             $"|HP: {CurrentHealth}/{MaxHealth}".PadRight(15,' '),
             $"|Attack: {Damage}".PadRight(15,' '),
             "|              ",

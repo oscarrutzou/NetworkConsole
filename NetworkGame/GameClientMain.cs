@@ -18,7 +18,7 @@ public static class GameClientMain
 
     private static Grid _localGameGrid;
     private static string _turnMsg = "";
-
+    private static bool _gameIsRunning = true;
     private static object _writeLock = new object();
     #endregion
 
@@ -43,21 +43,35 @@ public static class GameClientMain
         RequestAddClientMsg requestAddClientMsg = new RequestAddClientMsg();
         SendMessage(requestAddClientMsg, _endPoint);
     }
+
     static void DrawGrid()
     {
         Console.Write("\x1b[3J"); // Clear the scrollback buffer
         Console.Clear();
+
         _localGameGrid.DrawGrid();
-        Console.WriteLine("DRAWING GRID");
+        
+        //Console.Write("\x1b[3J"); // Clear the scrollback buffer
+        //Console.Clear();
+        //_localGameGrid.DrawGrid();
+
+        if (_lastGameMsg != null)
+        {
+            Console.WriteLine(_lastGameMsg.Message);
+        }
 
         Console.WriteLine(_turnMsg);
-        Console.WriteLine("UPDATE Write the old input {X,Y} {NewX,NewY}:");
+
+        if (_isUsersTurn)
+        {
+            Console.WriteLine("UPDATE Write the old input {X,Y} {NewX,NewY}:");
+        }
     }
     static void Update()
     {
         string pattern = @"^\d+\s+\d+\s+\d+\s+\d+$";
 
-        while (true)
+        while (_gameIsRunning)
         {
             try
             {
@@ -70,6 +84,8 @@ public static class GameClientMain
 
                 string input = Console.ReadLine();
                 int[] numbers;
+
+                if (!_isUsersTurn) continue;
 
                 // Write a pos
                 if (!Regex.IsMatch(input, pattern)) continue;
@@ -139,6 +155,7 @@ public static class GameClientMain
                     case MessageType.TurnMsg:
                         TurnMsg turnMsg = MessagePackSerializer.Deserialize<TurnMsg>(dataToDeserialize);
                         _turnMsg = turnMsg.Message;
+                        _isUsersTurn = turnMsg.IsUsersTurn;
 
                         lock (_writeLock)
                         {
@@ -150,10 +167,33 @@ public static class GameClientMain
 
                     case MessageType.ServerMsg:
                         ServerMsg serverMsg = MessagePackSerializer.Deserialize<ServerMsg>(dataToDeserialize);
+                        lock (_writeLock)
+                        {
+                            Console.WriteLine($"Server: {serverMsg.Message}");
+                        }
+                        break;
+
+                    case MessageType.GameMsg:
+                        GameMsg gameMsg = MessagePackSerializer.Deserialize<GameMsg>(dataToDeserialize);
+                        _lastGameMsg = gameMsg;
 
                         lock (_writeLock)
                         {
-                            Console.WriteLine($"Server msg: {serverMsg.Message}");
+                            if (_localGameGrid == null) break;
+                            DrawGrid();
+                        }
+
+                        break;
+
+                    case MessageType.StopGameMsg:
+                        StopGameMsg stopGameMsg = MessagePackSerializer.Deserialize<StopGameMsg>(dataToDeserialize);
+                        
+                        lock (_writeLock)
+                        {
+                            _localGameGrid = null;
+                            _gameIsRunning = false;
+                            Console.Clear();
+                            Console.WriteLine(stopGameMsg.Message);
                         }
                         break;
                 }
@@ -168,7 +208,8 @@ public static class GameClientMain
         }
     }
 
-
+    private static GameMsg _lastGameMsg;
+    private static bool _isUsersTurn;
     /// <summary>
     /// 
     /// </summary>

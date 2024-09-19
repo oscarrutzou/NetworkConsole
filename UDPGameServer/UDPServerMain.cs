@@ -20,7 +20,6 @@ public static class UDPServerMain
     static int _maxAmountOfPlayers = 2;
     static Grid _gameGrid;
 
-
     static UdpClient udpServer = new UdpClient(1234);
     static Dictionary<int, ClientData> Clients;
     private static Random _rnd = new();
@@ -134,55 +133,74 @@ public static class UDPServerMain
         while (true)
         {
             Thread.Sleep(50);
+            if (!_gameIsRunning) Thread.Sleep(1000);
             // Take time for it to be done, then turn sleep time up or down.
 
-            //lock (_clientLock)
-            //{
-            if (Clients.Count != _maxAmountOfPlayers) continue;
-            if (!first)
+            lock (_clientLock)
             {
-                first = true;
-                _turnNmb = 0;
-                _currentTurnClientData = Clients[_turnNmb];
-                StartGame();
-                continue;
-            }
-
-            bool haveMoved = false;
-            
-            while (!haveMoved)
-            {
-                lock (_moveRequestLock)
+                if (Clients.Count != _maxAmountOfPlayers) continue;
+                if (!first)
                 {
-                    if (_requestMovePosMsg == null) continue;
+                    first = true;
+                    _turnNmb = 0;
+                    _currentTurnClientData = Clients[_turnNmb];
+                    StartGame();
+                    continue;
+                }
 
-                    // Check the move data
-                    // If the msg is not a valid pos, continue;
-                    // Handle dmg and updated grid.
-                    // Send new data before change turn.
-                    // client has to wait for the updated grid, before its their turn.
+                bool haveMoved = false;
+                TryMoveData tryMoveData;
+                GameMsg gameMsg = null;
 
-                    Point prevPos = _requestMovePosMsg.PrevPos;
-                    Point newTargetPoint = _requestMovePosMsg.NewTargetPos;
-
-                    TryMoveData tryMoveData = _gameGrid.TryMoveObject(prevPos, newTargetPoint);
-
-                    if (tryMoveData.HasMoved)
+                while (!haveMoved)
+                {
+                    lock (_moveRequestLock)
                     {
-                        Console.WriteLine($"User {_turnNmb}: {tryMoveData.ReturnMsg}");
-                        haveMoved = true;
-                    }
+                        if (_requestMovePosMsg == null)
+                        {
+                            Thread.Sleep(50);
+                            continue;
+                        }
 
-                    ServerMsg serverMsg = new ServerMsg() { Message = tryMoveData.ReturnMsg };
-                    SendMessage(serverMsg, _currentTurnClientData.IPEndPoint);
-                    _requestMovePosMsg = null;
+                        Point prevPos = _requestMovePosMsg.PrevPos;
+                        Point newTargetPoint = _requestMovePosMsg.NewTargetPos;
+
+                        tryMoveData = _gameGrid.TryMoveObject(prevPos, newTargetPoint, _turnNmb);
+
+                        if (tryMoveData.HasDealtDamage || tryMoveData.HasMoved)
+                        {
+                            string msgToAllUsers = $"User {_turnNmb}: {tryMoveData.ReturnMsg}";
+
+                            gameMsg = new GameMsg() { Message = msgToAllUsers };
+                            // Write message to all users
+                            Console.WriteLine(msgToAllUsers);
+                            haveMoved = true;
+                            _requestMovePosMsg = null;
+                        }
+                        else
+                        {
+                            GameMsg gameMsgFail = new GameMsg() { Message = tryMoveData.ReturnMsg };
+                            // A msg like "Cant move there" to the current turn client
+                            SendMessage(gameMsgFail, _currentTurnClientData.IPEndPoint);
+                            _requestMovePosMsg = null;
+                        }
+
+
+                    }
+                }
+
+                // Updates grid too, for the players
+                ChangeTurn();
+
+                if (gameMsg != null)
+                {
+                    RelayMessageToAllUser(gameMsg);
                 }
             }
-
-            ChangeTurn();
         }
-        //}
     }
+    
+    private static bool _gameIsRunning = true;
 
     static byte[] SendMessage(NetworkMessage message, IPEndPoint endPoint)
     {
@@ -202,6 +220,12 @@ public static class UDPServerMain
                 break;
             case MessageType.ServerMsg:
                 messageBytes = MessagePackSerializer.Serialize((ServerMsg)message);
+                break;
+            case MessageType.GameMsg:
+                messageBytes = MessagePackSerializer.Serialize((GameMsg)message);
+                break;
+            case MessageType.StopGameMsg:
+                messageBytes = MessagePackSerializer.Serialize((StopGameMsg)message);
                 break;
             default:
                 break;
@@ -232,7 +256,7 @@ public static class UDPServerMain
                 SendRepeatMessage(combinedMsg, _clientEndPoint);
         }
     }
-
+    private static int _amountOfCharactersPrPlayers = 2;
     static void StartGame()
     {
         //Console.Clear();
@@ -242,17 +266,20 @@ public static class UDPServerMain
 
         for (int i = 0; i < Clients.Count; i++)
         {
-            bool hasFoundSpot = false;
-
-            while (!hasFoundSpot)
+            for (int j = 0; j < _amountOfCharactersPrPlayers; j++)
             {
-                int x = _rnd.Next(0, _gridX);
-                int y = _rnd.Next(0, _gridY);
-                if (_gameGrid.CharacterGrid[x, y] != null) continue;
-                hasFoundSpot = true;
+                bool hasFoundSpot = false;
 
-                Character player = new Character(i, new Point(x, y), $"Bob {i}", CharacterType.Warrior, 5, 10);
-                _gameGrid.AddObject(player, x, y);
+                while (!hasFoundSpot)
+                {
+                    int x = _rnd.Next(0, _gridX);
+                    int y = _rnd.Next(0, _gridY);
+                    if (_gameGrid.CharacterGrid[x, y] != null) continue;
+                    hasFoundSpot = true;
+
+                    Character player = new Character(i, new Point(x, y), $"Bob {i + j}", CharacterType.Warrior, 5, 20);
+                    _gameGrid.AddObject(player, x, y);
+                }
             }
         }
 
@@ -282,9 +309,9 @@ public static class UDPServerMain
         for (int i = 0; i < Clients.Count; i++)
         {
             if (i == _turnNmb)
-                turnMsg = new TurnMsg() { Message = responseMessage };
+                turnMsg = new TurnMsg() { Message = responseMessage, IsUsersTurn = true };
             else
-                turnMsg = new TurnMsg() { Message = othersResponseMessage };
+                turnMsg = new TurnMsg() { Message = othersResponseMessage, IsUsersTurn = false };
 
             SendMessage(turnMsg, Clients[i].IPEndPoint);
         }
@@ -302,6 +329,7 @@ public static class UDPServerMain
         List<ClientData> clientToDelete = new();
         while (true)
         {
+            if (Clients.Count == 0) Thread.Sleep(1000);
             Thread.Sleep(200);
             clientToDelete.Clear();
 
@@ -320,18 +348,21 @@ public static class UDPServerMain
             {
                 foreach (var item in clientToDelete)
                 {
-                    Console.WriteLine($"Client IP {item.IPEndPoint} has disconnected from server...");
+                    string stopMsg = $"Client IP {item.IPEndPoint} has disconnected from server...";
+                    Console.WriteLine(stopMsg);
                     int clientIndex = Clients.First(c => c.Value.IPEndPoint.Equals(item.IPEndPoint)).Key;
                     Clients.Remove(clientIndex);
-                    StopGame();
+                    StopGame(stopMsg);
                 }
             }
         }
     }
 
-    static void StopGame()
+    static void StopGame(string stopMsg)
     {
-        // Removes all clients
-        // Stop the game client + chat client.
+        _gameIsRunning = false;
+        StopGameMsg stopGameMsg = new StopGameMsg() { Message = stopMsg };
+        RelayMessageToAllUser(stopGameMsg);
+        
     }
 }

@@ -14,8 +14,10 @@ public enum MessageType
     HeartBeat,
     RequestMovePosition,
     ServerMsg,
+    GameMsg,
     TurnMsg,
     UpdateGrid,
+    StopGameMsg,
 }
 
 
@@ -42,8 +44,20 @@ public class TurnMsg : NetworkMessage
     [Key(0)]
     public string Message;
 
+    [Key(1)]
+    public bool IsUsersTurn;
+
     [IgnoreMember]
     public override MessageType MessageType => MessageType.TurnMsg;
+}
+
+public class GameMsg : NetworkMessage
+{
+    [Key(0)]
+    public string Message;
+
+    [IgnoreMember]
+    public override MessageType MessageType => MessageType.GameMsg;
 }
 
 public class ServerMsg : NetworkMessage
@@ -55,6 +69,14 @@ public class ServerMsg : NetworkMessage
     public override MessageType MessageType => MessageType.ServerMsg;
 }
 
+public class StopGameMsg : NetworkMessage
+{
+    [Key(0)]
+    public string Message;
+
+    [IgnoreMember]
+    public override MessageType MessageType => MessageType.StopGameMsg;
+}
 public class RequestAddClientMsg : NetworkMessage
 {
     [IgnoreMember]
