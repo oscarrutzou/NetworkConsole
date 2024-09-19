@@ -51,10 +51,6 @@ public static class GameClientMain
 
         _localGameGrid.DrawGrid();
         
-        //Console.Write("\x1b[3J"); // Clear the scrollback buffer
-        //Console.Clear();
-        //_localGameGrid.DrawGrid();
-
         if (_lastGameMsg != null)
         {
             Console.WriteLine(_lastGameMsg.Message);
@@ -110,9 +106,9 @@ public static class GameClientMain
     {
         byte[] combinedBytes = null;
         HeartBeatMsg heartBeatMsg = new HeartBeatMsg();
-        while (true)
+        while (_gameIsRunning)
         {
-            Thread.Sleep(100);
+            Thread.Sleep(400);
             SendStartMsg();
 
             if (combinedBytes == null)
@@ -124,7 +120,7 @@ public static class GameClientMain
 
     static void ReceiveMessages()
     {
-        while (true)
+        while (_gameIsRunning)
         {
             try
             {

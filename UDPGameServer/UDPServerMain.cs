@@ -135,68 +135,66 @@ public static class UDPServerMain
             Thread.Sleep(50);
             if (!_gameIsRunning) Thread.Sleep(1000);
             // Take time for it to be done, then turn sleep time up or down.
-
-            lock (_clientLock)
+        
+            if (Clients.Count != _maxAmountOfPlayers) continue;
+            if (!first)
             {
-                if (Clients.Count != _maxAmountOfPlayers) continue;
-                if (!first)
-                {
-                    first = true;
-                    _turnNmb = 0;
-                    _currentTurnClientData = Clients[_turnNmb];
-                    StartGame();
-                    continue;
-                }
+                first = true;
+                _turnNmb = 0;
+                _currentTurnClientData = Clients[_turnNmb];
+                StartGame();
+                continue;
+            }
 
-                bool haveMoved = false;
-                TryMoveData tryMoveData;
-                GameMsg gameMsg = null;
+            bool haveMoved = false;
+            TryMoveData tryMoveData;
+            GameMsg gameMsg = null;
 
-                while (!haveMoved)
+            while (!haveMoved)
+            {
+                lock (_moveRequestLock)
                 {
-                    lock (_moveRequestLock)
+                    if (_requestMovePosMsg == null)
                     {
-                        if (_requestMovePosMsg == null)
-                        {
-                            Thread.Sleep(50);
-                            continue;
-                        }
-
-                        Point prevPos = _requestMovePosMsg.PrevPos;
-                        Point newTargetPoint = _requestMovePosMsg.NewTargetPos;
-
-                        tryMoveData = _gameGrid.TryMoveObject(prevPos, newTargetPoint, _turnNmb);
-
-                        if (tryMoveData.HasDealtDamage || tryMoveData.HasMoved)
-                        {
-                            string msgToAllUsers = $"User {_turnNmb}: {tryMoveData.ReturnMsg}";
-
-                            gameMsg = new GameMsg() { Message = msgToAllUsers };
-                            // Write message to all users
-                            Console.WriteLine(msgToAllUsers);
-                            haveMoved = true;
-                            _requestMovePosMsg = null;
-                        }
-                        else
-                        {
-                            GameMsg gameMsgFail = new GameMsg() { Message = tryMoveData.ReturnMsg };
-                            // A msg like "Cant move there" to the current turn client
-                            SendMessage(gameMsgFail, _currentTurnClientData.IPEndPoint);
-                            _requestMovePosMsg = null;
-                        }
-
-
+                        Thread.Sleep(50);
+                        continue;
                     }
-                }
 
-                // Updates grid too, for the players
-                ChangeTurn();
+                    Point prevPos = _requestMovePosMsg.PrevPos;
+                    Point newTargetPoint = _requestMovePosMsg.NewTargetPos;
 
-                if (gameMsg != null)
-                {
-                    RelayMessageToAllUser(gameMsg);
+                    tryMoveData = _gameGrid.TryMoveObject(prevPos, newTargetPoint, _turnNmb);
+
+                    if (tryMoveData.HasDealtDamage || tryMoveData.HasMoved)
+                    {
+                        string msgToAllUsers = $"User {_turnNmb}: {tryMoveData.ReturnMsg}";
+
+                        gameMsg = new GameMsg() { Message = msgToAllUsers };
+                        // Write message to all users
+                        Console.WriteLine(msgToAllUsers);
+                        haveMoved = true;
+                        _requestMovePosMsg = null;
+                    }
+                    else
+                    {
+                        GameMsg gameMsgFail = new GameMsg() { Message = tryMoveData.ReturnMsg };
+                        // A msg like "Cant move there" to the current turn client
+                        SendMessage(gameMsgFail, _currentTurnClientData.IPEndPoint);
+                        _requestMovePosMsg = null;
+                    }
+
+
                 }
             }
+
+            // Updates grid too, for the players
+            ChangeTurn();
+
+            if (gameMsg != null)
+            {
+                RelayMessageToAllUser(gameMsg);
+            }
+            
         }
     }
     
@@ -247,9 +245,11 @@ public static class UDPServerMain
     static void RelayMessageToAllUser(NetworkMessage message)
     {
         byte[] combinedMsg = null;
-        for (int i = 0; i < Clients.Count; i++)
+
+        // Uses the keys, so we can e.g stop the 0 client, and it still sends to all clients
+        foreach (int key in Clients.Keys)
         {
-            IPEndPoint _clientEndPoint = Clients[i].IPEndPoint;
+            IPEndPoint _clientEndPoint = Clients[key].IPEndPoint;
             if (combinedMsg == null)
                 combinedMsg = SendMessage(message, _clientEndPoint);
             else
@@ -285,7 +285,6 @@ public static class UDPServerMain
 
         UpdateGrid();
     }
-
 
     static void UpdateGrid()
     {
@@ -323,14 +322,21 @@ public static class UDPServerMain
         _currentTurnClientData = Clients[_turnNmb];
         UpdateGrid();
     }
+    /*
+        ae82d696-d7a0-4f0f-ab37-148fef010697: HeartBeat 27,6417 ms
+        NEW CLIENT: 127.0.0.1:52256:: ID: 89bc3871-6d01-44ea-bf8b-2d76fa7c6788
+        Started game with 2 players
+        ae82d696-d7a0-4f0f-ab37-148fef010697: HeartBeat 15,38 ms
+        89bc3871-6d01-44ea-bf8b-2d76fa7c6788: HeartBeat 15,5247 ms
 
+     */
     static void HeartBeatDeleteWhenOffline()
     {
         List<ClientData> clientToDelete = new();
         while (true)
         {
-            if (Clients.Count == 0) Thread.Sleep(1000);
-            Thread.Sleep(200);
+            //if (Clients.Count == 0) Thread.Sleep(1000);
+            Thread.Sleep(500);
             clientToDelete.Clear();
 
             // Loops though the list. 
@@ -338,23 +344,24 @@ public static class UDPServerMain
             {
                 TimeSpan timeSpan = DateTime.Now - data.LastHeartBeat;
 
+
                 if (timeSpan.TotalMilliseconds >= 2000)
                 {
                     clientToDelete.Add(data);
                 }
             }
-
-            lock (_clientLock)
+            
+            foreach (var item in clientToDelete)
             {
-                foreach (var item in clientToDelete)
-                {
-                    string stopMsg = $"Client IP {item.IPEndPoint} has disconnected from server...";
-                    Console.WriteLine(stopMsg);
-                    int clientIndex = Clients.First(c => c.Value.IPEndPoint.Equals(item.IPEndPoint)).Key;
-                    Clients.Remove(clientIndex);
-                    StopGame(stopMsg);
-                }
+                string stopMsg = $"Client IP {item.IPEndPoint} has disconnected from server...";
+                Console.WriteLine(stopMsg);
+                int clientIndex = Clients.First(c => c.Value.IPEndPoint.Equals(item.IPEndPoint)).Key;
+                Clients.Remove(clientIndex);
+                StopGame(stopMsg);
             }
+            //lock (_clientLock)
+            //{
+            //}
         }
     }
 
