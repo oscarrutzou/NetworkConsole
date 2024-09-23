@@ -30,14 +30,7 @@ namespace TCP
                 Thread clientThread = new Thread(() => HandleClient(client));
                 clientThread.Start();
             }
-
         }
-
-        /*
-         * First when connected, send a key to the client
-         * 
-         * 
-         */
 
         static void HandleClient(TcpClient client)
         {
@@ -53,6 +46,7 @@ namespace TCP
                 {
                     int messageLength = bwr.ReadInt32();
                     byte messageType = bwr.ReadByte();
+                    bool encrypted = bwr.ReadBoolean();
                     // Read the message data
                     byte[] messageBytes = bwr.ReadBytes(messageLength);
                     TCPMessagesTypes recievedType = (TCPMessagesTypes)messageType;
@@ -93,9 +87,11 @@ namespace TCP
 
                             break;
                         case TCPMessagesTypes.C_RequestListMsg:
-                            string users = $"Online users:\n{connectedClients.GetNameOfAllAsSingleString}";
+                            string listUser = connectedClients.GetNameOfAllAsSingleString().ToString();
+                            string users = $"\nOnline users:\n{listUser}\n";
                             TCPListMsg listMsg = new TCPListMsg() { List = users};
-                            //myInfo.SendMessage()
+                            myInfo.SendMessage(listMsg);
+
                             break;
 
                             //case MessageType.Hello:
@@ -387,9 +383,11 @@ namespace TCP
             byte[] messageBytes = new byte[1024];
             TCPChatMsg mes = new TCPChatMsg() { Message = message };
             messageBytes = MessagePackSerializer.Serialize(mes);
+            bool encrypted = false;
 
             bWriter.Write(messageBytes.Length);
             bWriter.Write(mes.GetMessageTypeAsByte);
+            bWriter.Write(encrypted);
             bWriter.Write(messageBytes);
             bWriter.Flush();
         }
@@ -397,9 +395,13 @@ namespace TCP
         public void SendMessage(TCPNetworkMessage message)
         {
             byte[] messageBytes = new byte[1024];
+            bool encrypted = false;
 
             switch (message.MessageType)
             {
+                case TCPMessagesTypes.S_AnswerKey:
+                    messageBytes = MessagePackSerializer.Serialize((TCPAnswerKeyMsg)message);
+                    break;
                 case TCPMessagesTypes.ChatMessage:
                     messageBytes = MessagePackSerializer.Serialize((TCPChatMsg)message);
                     break;
@@ -416,6 +418,7 @@ namespace TCP
 
             bWriter.Write(messageBytes.Length);
             bWriter.Write(message.GetMessageTypeAsByte);
+            bWriter.Write(encrypted);
             bWriter.Write(messageBytes);
             bWriter.Flush();
         }

@@ -80,14 +80,20 @@ namespace ChatClient
             }
         }
 
+        private static void SendStartMsg()
+        {
+
+        }
+
         private static void SendMessage(TCPNetworkMessage message)
         {
             byte[] messageBytes = new byte[1024];
-
+            bool encrypted = false;
             switch (message.MessageType)
             {
                 case TCPMessagesTypes.C_RequestKey:
                     messageBytes = MessagePackSerializer.Serialize((TCPRequestKeyMsg)message);
+                    //encrypted = false;
                     break;
                 case TCPMessagesTypes.ChatMessage:
                     messageBytes = MessagePackSerializer.Serialize((TCPChatMsg)message);
@@ -100,25 +106,47 @@ namespace ChatClient
                     break;
             }
 
-            _bw.Write(messageBytes.Length);
+            byte[] finalMsg = messageBytes;
+
+            //if (encrypted)
+            //{
+            //    // En bool hvis den er krypteret.
+            //    byte[] iv = new byte[16];
+            //    RandomNumberGenerator.Fill(iv);
+
+            //    byte[] cypherText = Encryption.Encrypt(messageBytes, _key, iv);
+            //    finalMsg = cypherText;
+            //}
+
+            _bw.Write(finalMsg.Length);
             _bw.Write(message.GetMessageTypeAsByte);
-            _bw.Write(messageBytes);
+            _bw.Write(encrypted);
+            _bw.Write(finalMsg);
+           
             _bw.Flush();
         }
+        
+        private static byte[] _key;
 
         private static void ReceiveMessages(TcpClient client)
         {
             BinaryReader bwr = new BinaryReader(client.GetStream());
             while (client.Connected)
             {
-                int messageLength = bwr.ReadInt32();
+                int  messageLength = bwr.ReadInt32();
                 byte messageType = bwr.ReadByte();
+                bool encrypted = bwr.ReadBoolean();
                 // Read the message data
                 byte[] messageBytes = bwr.ReadBytes(messageLength);
 
                 TCPMessagesTypes receivedType = (TCPMessagesTypes)messageType;
                 switch (receivedType)
                 {
+                    case TCPMessagesTypes.S_AnswerKey:
+                        TCPAnswerKeyMsg keyMsg = MessagePackSerializer.Deserialize<TCPAnswerKeyMsg>(messageBytes);
+                        _key = keyMsg.Key;
+                        break;
+
                     case TCPMessagesTypes.ChatMessage:
                         TCPChatMsg chatMes = MessagePackSerializer.Deserialize<TCPChatMsg>(messageBytes);
                         Console.WriteLine(chatMes.Message);

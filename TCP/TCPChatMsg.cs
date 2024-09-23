@@ -80,7 +80,7 @@ namespace TCP
         [Key(0)]
         public string Message { get; set; }
         [IgnoreMember]
-        public override TCPMessagesTypes MessageType => TCPMessagesTypes.ChatMessage;
+        public override TCPMessagesTypes MessageType => TCPMessagesTypes.S_ServerMessage;
     }
     
     public class TCPRequestListMsg : TCPNetworkMessage
@@ -94,6 +94,6 @@ namespace TCP
         [Key(0)]
         public string List { get; set; }
         [IgnoreMember]
-        public override TCPMessagesTypes MessageType => TCPMessagesTypes.C_RequestListMsg;
+        public override TCPMessagesTypes MessageType => TCPMessagesTypes.S_ListMsg;
     }
 }
