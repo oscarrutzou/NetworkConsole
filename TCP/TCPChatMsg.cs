@@ -59,6 +59,7 @@ namespace TCP
         [IgnoreMember]
         public override TCPMessagesTypes MessageType => TCPMessagesTypes.S_WelcomeNewUser;
     }
+
     public class TCPJoinServerMsg : TCPNetworkMessage
     {
         [Key(0)]
@@ -70,7 +71,13 @@ namespace TCP
     public class TCPChatMsg : TCPNetworkMessage
     {
         [Key(0)]
-        public string Message { get; set; }
+        public byte[] Cypher_Message { get; set; }
+
+        [Key(1)]
+        public byte[] IV { get; set; }
+        
+        [IgnoreMember]
+        public string Temp_Text { get; set; }
         [IgnoreMember]
         public override TCPMessagesTypes MessageType => TCPMessagesTypes.ChatMessage;
     }

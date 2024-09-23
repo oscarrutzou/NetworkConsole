@@ -3,9 +3,9 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace ChatClient;
+namespace TCP;
 
-public class Encryption
+public static class Encryption
 {
     public static byte[] Encrypt(byte[] plainBytes, byte[] key, byte[] iv)
     {
