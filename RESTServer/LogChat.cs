@@ -26,9 +26,9 @@ namespace RESTServer
         }
         
         [HttpPost]
-        public IActionResult Post([FromBody] PostTest post)
+        public IActionResult Post([FromBody] PostRestData post)
         {
-            _log += ($"{post.name}: {post.mess} \n");
+            _log += ($"{post.Name}: {post.Message} \n");
             return Ok(_log);
         }
 
