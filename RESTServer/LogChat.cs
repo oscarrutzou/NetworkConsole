@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration.UserSecrets;
-using RESTServer.ControllerClasses;
+
 using System.Diagnostics;
+using TCP;
 
 namespace RESTServer
 {
@@ -11,6 +12,7 @@ namespace RESTServer
     
     public class LogChat : ControllerBase
     {
+        
         private static string _log;
         static LogChat()
         {
@@ -23,19 +25,20 @@ namespace RESTServer
             return Ok(_log);
         }
         
-        [HttpPost("{message}")]
-        public IActionResult Post(string message)
+        [HttpPost]
+        public IActionResult Post([FromBody] PostTest post)
         {
-            
-            return Ok(_log+message+"/n");
+            _log += ($"{post.name}: {post.mess} \n");
+            return Ok(_log);
         }
 
         //string apiUrl = "https://localhost:7019/LogChat/";
 
         //HttpClient httpClient = new HttpClient();
         //HttpJsonPostData postData = new HttpJsonPostData()
-        //{
-            
+        //{_log+message+"/n"
+
         //};
     }
+    
 }

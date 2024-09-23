@@ -1,4 +1,6 @@
 ﻿using System.Net.Sockets;
+using System.Text.Json;
+using System.Text;
 namespace ChatClient;
 
 public static class ChatClientMain
@@ -15,6 +17,9 @@ public static class ChatClientMain
         receiverThread.IsBackground = true;
         receiverThread.Start();
 
+
+
+
         //Send messages with the via the following
         StreamWriter writer = new StreamWriter(client.GetStream());
         while (true)
@@ -22,6 +27,7 @@ public static class ChatClientMain
             string message = Console.ReadLine();
             writer.WriteLine(message);
             writer.Flush();
+
         }
     }
 
@@ -36,5 +42,9 @@ public static class ChatClientMain
                 Console.WriteLine(message);
             }
         }
-    }
+    } 
 }
+
+
+
+    
