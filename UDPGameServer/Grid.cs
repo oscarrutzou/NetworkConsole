@@ -142,48 +142,11 @@ public class Grid
             }
         }
     }
-
-
 }
+
 public struct TryMoveData
 {
     public bool HasMoved { get; set; }
     public bool HasDealtDamage { get; set; }
     public string ReturnMsg { get; set; }
 }
-
-/*
- *         StringBuilder sb = new StringBuilder();
-        //add initinal line
-        for (int i = 0; i < CharacterGrid.GetLength(0); i++)
-        {
-            sb.Append("_______________");
-        }
-
-        sb.Append('\n');
-
-        for (int y = 0; y < CharacterGrid.GetLength(1); y++)
-        {
-            for (int i = 0; i < _emptyCharaterFields.Length; i++)
-            {
-                for (int x = 0; x < CharacterGrid.GetLength(0); x++)
-                {
-                    if (i == _indexOfPosition)
-                    {
-                        sb.Append("|" + $"{y},{x}".PadLeft(14, ' '));
-                    }
-                    else
-                    {
-                        if (CharacterGrid[x, y] != null)
-                            sb.Append(CharacterGrid[x, y].GetGridData()[i]);
-                        else
-                            sb.Append(_emptyCharaterFields[i]);
-                    }
-                }
-                sb.AppendLine("|");
-            }
-        }
-
-        Console.WriteLine(sb.ToString());
-    }
- */

@@ -182,8 +182,6 @@ public static class UDPServerMain
                         SendMessage(gameMsgFail, _currentTurnClientData.IPEndPoint);
                         _requestMovePosMsg = null;
                     }
-
-
                 }
             }
 
