@@ -1,50 +1,82 @@
-﻿using System.Net.Sockets;
-using System.Text.Json;
+﻿using System;
+using System.IO;
+using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
-namespace ChatClient;
+using System.Threading;
 
-public static class ChatClientMain
+namespace ChatClient
 {
-    public static void Main(string[] args)
+    public static class ChatClientMain
     {
-        TcpClient client = new TcpClient();
-        client.Connect("localhost", 12345);
-        Console.WriteLine("Connected to the server.");
-        Console.WriteLine("What is your desired username?");
-
-        //Starts a thread to receive messages
-        Thread receiverThread = new Thread(() => ReceiveMessages(client));
-        receiverThread.IsBackground = true;
-        receiverThread.Start();
-
-
-
-
-        //Send messages with the via the following
-        StreamWriter writer = new StreamWriter(client.GetStream());
-        while (true)
+        public static void Main(string[] args)
         {
-            string message = Console.ReadLine();
-            writer.WriteLine(message);
-            writer.Flush();
 
-        }
-    }
+            //byte[] key = new byte[16]; 
+            //byte[] iv = new byte[16]; 
+            //using (var rng = new RNGCryptoServiceProvider())
+            //{
+            //    rng.GetBytes(key);
+            //    rng.GetBytes(iv);
+            //}
+            TcpClient client = new TcpClient();
+            client.Connect("localhost", 12345);
+            Console.WriteLine("Connected to the server.");
+            Console.WriteLine("What is your desired username?");
 
-    static void ReceiveMessages(TcpClient client)
-    {
-        StreamReader reader = new StreamReader(client.GetStream());
-        while (client.Connected)
-        {
-            string message = reader.ReadLine();
-            if (message != null)
+            // Start a thread to receive messages
+            Thread receiverThread = new Thread(() => ReceiveMessages(client, /*key, iv*/));
+            receiverThread.IsBackground = true;
+            receiverThread.Start();
+
+            // Send messages
+            using (NetworkStream networkStream = client.GetStream())
+            using (StreamWriter writer = new StreamWriter(networkStream))
             {
-                Console.WriteLine(message);
+                while (true)
+                {
+                    string message = Console.ReadLine();
+
+                    try
+                    {
+                        //byte[] encryptedMessageBytes = Encryption.Encrypt(message, /*key, iv*/);
+                        //string encryptedMessageBase64 = Convert.ToBase64String(encryptedMessageBytes);
+                        writer.WriteLine(message/*encryptedMessageBase64*/);
+                        writer.Flush();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"An error occurred while sending the message: {ex.Message}");
+                    }
+                }
             }
         }
-    } 
+
+        static void ReceiveMessages(TcpClient client, /*byte[] key, byte[] iv*/)
+        {
+            using (NetworkStream networkStream = client.GetStream())
+            using (StreamReader reader = new StreamReader(networkStream))
+            {
+                while (client.Connected)
+                {
+                    try
+                    {   string message = reader.ReadLine();
+                        if (message != null)
+                        //string encryptedMessageBase64 = reader.ReadLine();
+                        if (encryptedMessageBase64 != null)
+                        {
+                            //byte[] encryptedMessageBytes = Convert.FromBase64String(encryptedMessageBase64);
+                            //string decryptedMessage = Encryption.Decrypt(encryptedMessageBytes, key, iv);
+                            Console.WriteLine($"{message}");
+                            //Console.WriteLine(decryptedMessage);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"An error occurred while receiving or decrypting the message: {ex.Message}");
+                    }
+                }
+            }
+        }
+    }
 }
-
-
-
-    
