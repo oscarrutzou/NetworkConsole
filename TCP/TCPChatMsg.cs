@@ -16,7 +16,7 @@ namespace TCP
         ChatMessage, // client to server
         S_ServerMessage,
         C_RequestListMsg,
-        S_ListMsg,
+        C_RequestLogMsg,
     }
 
     [MessagePackObject]
@@ -95,12 +95,9 @@ namespace TCP
         [IgnoreMember]
         public override TCPMessagesTypes MessageType => TCPMessagesTypes.C_RequestListMsg;
     }
-
-    public class TCPListMsg : TCPNetworkMessage
+    public class TCPRequestLogMsg : TCPNetworkMessage
     {
-        [Key(0)]
-        public string List { get; set; }
         [IgnoreMember]
-        public override TCPMessagesTypes MessageType => TCPMessagesTypes.S_ListMsg;
+        public override TCPMessagesTypes MessageType => TCPMessagesTypes.C_RequestLogMsg;
     }
 }

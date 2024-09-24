@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MessagePack;
+using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -7,6 +8,31 @@ namespace TCP;
 
 public static class Encryption
 {
+
+    public static byte[] SerilizeChatMsg(TCPChatMsg chatMsg, byte[] key) // Program.AnswerKeyMsg.Key
+    {
+        byte[] messageBytes = new byte[1024];
+
+        byte[] iv = new byte[16];
+        RandomNumberGenerator.Fill(iv);
+        chatMsg.IV = iv;
+        byte[] textInBytes = Encoding.UTF8.GetBytes(chatMsg.Temp_Text);
+        chatMsg.Cypher_Message = Encrypt(textInBytes, key, iv);
+
+        messageBytes = MessagePackSerializer.Serialize(chatMsg);
+        return messageBytes;
+    }
+
+    public static TCPChatMsg DeSerilizeChatMsg(byte[] messageBytes, byte[] key)
+    {
+        TCPChatMsg chatMes = MessagePackSerializer.Deserialize<TCPChatMsg>(messageBytes);
+        byte[] decryptedChatMsg = Decrypt(chatMes.Cypher_Message, key, chatMes.IV);
+        string chatMsg = Encoding.UTF8.GetString(decryptedChatMsg);
+        chatMes.Temp_Text = chatMsg;
+
+        return chatMes;
+    }
+
     public static byte[] Encrypt(byte[] plainBytes, byte[] key, byte[] iv)
     {
         using (Aes aes = Aes.Create())

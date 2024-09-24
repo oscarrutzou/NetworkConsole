@@ -59,31 +59,31 @@ public static class ChatClientMain
             {
                 mes = new TCPRequestListMsg();
             }
-            // Join game
-            // Starts a game server if there isnt one running.
-            // Also starts a game client
-            //else if (message.StartsWith("d "))
-            //{
-            //    var split = message.Split(" ", 3);
-            //    if (split.Count() <= 2)
-            //    {
-            //        Console.WriteLine("d argument must have at least 2 parameters");
-            //        continue;
-            //    }
-            //    mes = new DirectMessage() { Message = split[2], recipient = split[1] };
-            //}
+            else if (message == "!log")
+            {
+                mes = new TCPRequestLogMsg();   
+            } 
             else
             {
                 mes = new TCPChatMsg() { Temp_Text = message };
             }
+            
             SendMessage(mes);
         }
     }
-
-    private static void SendStartMsg()
-    {
-
-    }
+    // Join game
+    // Starts a game server if there isnt one running.
+    // Also starts a game client
+    //else if (message.StartsWith("d "))
+    //{
+    //    var split = message.Split(" ", 3);
+    //    if (split.Count() <= 2)
+    //    {
+    //        Console.WriteLine("d argument must have at least 2 parameters");
+    //        continue;
+    //    }
+    //    mes = new DirectMessage() { Message = split[2], recipient = split[1] };
+    //}
 
     private static void SendMessage(TCPNetworkMessage message)
     {
@@ -96,14 +96,7 @@ public static class ChatClientMain
                 break;
 
             case TCPMessagesTypes.ChatMessage:
-                byte[] iv = new byte[16];
-                RandomNumberGenerator.Fill(iv);
-                TCPChatMsg chatMsg = (TCPChatMsg)message;
-                chatMsg.IV = iv;
-                byte[] textInBytes = Encoding.UTF8.GetBytes(chatMsg.Temp_Text);
-                chatMsg.Cypher_Message = Encryption.Encrypt(textInBytes, _key, iv);
-
-                messageBytes = MessagePackSerializer.Serialize(chatMsg);
+                messageBytes = Encryption.SerilizeChatMsg((TCPChatMsg)message, _key);
                 break;
 
             case TCPMessagesTypes.C_JoinServer:
@@ -112,9 +105,11 @@ public static class ChatClientMain
             case TCPMessagesTypes.C_RequestListMsg:
                 messageBytes = MessagePackSerializer.Serialize((TCPRequestListMsg)message);
                 break;
+            case TCPMessagesTypes.C_RequestLogMsg:
+                messageBytes = MessagePackSerializer.Serialize((TCPRequestLogMsg)message);
+                break;
         }
         
-
         _bw.Write(messageBytes.Length);
         _bw.Write(message.GetMessageTypeAsByte);
         _bw.Write(messageBytes);
@@ -148,114 +143,16 @@ public static class ChatClientMain
                     break;
 
                 case TCPMessagesTypes.ChatMessage:
-                    TCPChatMsg chatMes = MessagePackSerializer.Deserialize<TCPChatMsg>(messageBytes);
-                    //string decryptedChatMsg = Encryption.Decrypt(chatMes.Cypher_Message, _key, chatMes.IV).ToString();
-
-                    Console.WriteLine(chatMes.Cypher_Message);
+                    TCPChatMsg chatMes = Encryption.DeSerilizeChatMsg(messageBytes, _key);
+                    Console.WriteLine(chatMes.Temp_Text);
                     break;
 
                 case TCPMessagesTypes.S_ServerMessage:
                     TCPServerMsg serverMes = MessagePackSerializer.Deserialize<TCPServerMsg>(messageBytes);
                     Console.WriteLine(serverMes.Message);
                     break;
-
-                case TCPMessagesTypes.S_ListMsg:
-                    TCPListMsg listMsg = MessagePackSerializer.Deserialize<TCPListMsg>(messageBytes);
-                    Console.WriteLine(listMsg.List);
-                    break;
             }
         }
     }
 
 }
-//public static class ChatClientMain
-//{
-//    private static byte[] KEY;
-//    private static byte[] IV;
-//    private static byte[] CIPHER_TEXT;
-
-//    public static void Main(string[] args)
-//    {
-
-//        //byte[] key = new byte[16]; 
-//        //byte[] iv = new byte[16]; 
-//        //using (var rng = new RNGCryptoServiceProvider())
-//        //{
-//        //    rng.GetBytes(key);
-//        //    rng.GetBytes(iv);
-//        //}
-
-
-//        TcpClient client = new TcpClient();
-//        client.Connect("localhost", 12345);
-//        Console.WriteLine("Connected to the server.");
-//        Console.WriteLine("What is your desired username?");
-
-//        // Start a thread to receive messages
-//        Thread receiverThread = new Thread(() => ReceiveMessages(client /*, key, iv*/));
-//        receiverThread.IsBackground = true;
-//        receiverThread.Start();
-
-//        SHA256 sHA = SHA256.Create();
-//        byte[] key = sHA.ComputeHash(Encoding.UTF8.GetBytes("something lol")); // A random key
-//        var rng = new RNGCryptoServiceProvider();
-
-
-//        // Send messages
-//        using (NetworkStream networkStream = client.GetStream())
-//        using (StreamWriter writer = new StreamWriter(networkStream))
-//        {
-//            while (true)
-//            {
-//                string message = Console.ReadLine();
-
-//                try
-//                {
-//                    byte[] iv = new byte[16];
-//                    rng.GetBytes(iv);
-
-//                    // Save IV in message and send it with cipher text
-
-//                    CIPHER_TEXT = Encryption.Encrypt(message, KEY, iv);
-//                    TCPChatMsg msg = new TCPChatMsg() { Message = CIPHER_TEXT, IV = iv};
-
-//                    //writer.WriteLine(CIPHER_TEXT.ToString());
-//                    writer.WriteLine(message);
-//                    writer.Flush();
-//                }
-//                catch (Exception ex)
-//                {
-//                    Console.WriteLine($"An error occurred while sending the message: {ex.Message}");
-//                }
-//            }
-//        }
-//    }
-
-//    static void ReceiveMessages(TcpClient client)
-//    {
-//        using (NetworkStream networkStream = client.GetStream())
-//        using (StreamReader reader = new StreamReader(networkStream))
-//        {
-//            while (client.Connected)
-//            {
-//                try
-//                {   string message = reader.ReadLine();
-//                    Console.WriteLine($"{message}");
-
-//                    //if (message != null)
-//                    //// string encryptedMessageBase64 = reader.ReadLine();
-//                    //if (encryptedMessageBase64 != null)
-//                    //{
-//                    //    //byte[] encryptedMessageBytes = Convert.FromBase64String(encryptedMessageBase64);
-//                    //    //string decryptedMessage = Encryption.Decrypt(encryptedMessageBytes, key, iv);
-//                    //    //Console.WriteLine(decryptedMessage);
-//                    //}
-//                }
-//                catch (Exception ex)
-//                {
-//                    Console.WriteLine($"An error occurred while receiving or decrypting the message: {ex.Message}");
-//                }
-//            }
-//        }
-//    }
-//}
