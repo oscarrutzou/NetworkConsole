@@ -88,7 +88,6 @@ public static class ChatClientMain
     private static void SendMessage(TCPNetworkMessage message)
     {
         byte[] messageBytes = new byte[1024];
-        byte[] finalMsg = null;
 
         switch (message.MessageType)
         {
@@ -97,12 +96,14 @@ public static class ChatClientMain
                 break;
 
             case TCPMessagesTypes.ChatMessage:
-                //byte[] iv = new byte[16];
-                //RandomNumberGenerator.Fill(iv);
-                //TCPChatMsg tcpChatMsg = ;
-                //tcpChatMsg.IV = iv;
-                messageBytes = MessagePackSerializer.Serialize((TCPChatMsg)message);
-                //finalMsg = Encryption.Encrypt(messageBytes, _key, iv);
+                byte[] iv = new byte[16];
+                RandomNumberGenerator.Fill(iv);
+                TCPChatMsg chatMsg = (TCPChatMsg)message;
+                chatMsg.IV = iv;
+                byte[] textInBytes = Encoding.UTF8.GetBytes(chatMsg.Temp_Text);
+                chatMsg.Cypher_Message = Encryption.Encrypt(textInBytes, _key, iv);
+
+                messageBytes = MessagePackSerializer.Serialize(chatMsg);
                 break;
 
             case TCPMessagesTypes.C_JoinServer:
@@ -113,11 +114,10 @@ public static class ChatClientMain
                 break;
         }
         
-        finalMsg = messageBytes;
 
-        _bw.Write(finalMsg.Length);
+        _bw.Write(messageBytes.Length);
         _bw.Write(message.GetMessageTypeAsByte);
-        _bw.Write(finalMsg);
+        _bw.Write(messageBytes);
        
         _bw.Flush();
     }
@@ -133,7 +133,6 @@ public static class ChatClientMain
             byte messageType = bwr.ReadByte();
             // Read the message data
             byte[] messageBytes = bwr.ReadBytes(messageLength);
-
 
             TCPMessagesTypes receivedType = (TCPMessagesTypes)messageType;
             switch (receivedType)

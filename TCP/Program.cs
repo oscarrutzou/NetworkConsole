@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text;
 using System.Security.Cryptography;
 using MessagePack;
+using System.Collections;
 
 namespace TCP;
 
@@ -20,7 +21,7 @@ public static class Program
         Console.WriteLine("Server started... listening on port 12000");
         SHA256 sHA = SHA256.Create();
         byte[] key = sHA.ComputeHash(Encoding.UTF8.GetBytes("secureKey:d")); // A random key
-        _answerKeyMsg = new TCPAnswerKeyMsg() { Key = key};
+        _answerKeyMsg = new TCPAnswerKeyMsg() { Key = key };
 
         while (true)
         {
@@ -71,22 +72,23 @@ public static class Program
                         string welcomeMsg = $"New user {joinServer.Name} joined";
                         Console.WriteLine(welcomeMsg);
 
-                        connectedClients.SendMessageToAll(welcomeMsg +  ": Say hallo:D", myInfo);
+                        connectedClients.SendMessageToAll(welcomeMsg + ": Say hallo:D", myInfo);
                         break;
                     case TCPMessagesTypes.ChatMessage:
                         TCPChatMsg chatMes = MessagePackSerializer.Deserialize<TCPChatMsg>(messageBytes);
-                        string decryptedChatMsg = Encryption.Decrypt(chatMes.Cypher_Message, _answerKeyMsg.Key, chatMes.IV).ToString();
-                        string sentMes = $"{myInfo.Name}: {decryptedChatMsg}";
-                        
+                        byte[] decryptedChatMsg = Encryption.Decrypt(chatMes.Cypher_Message, _answerKeyMsg.Key, chatMes.IV);
+                        string chatMsg = Encoding.UTF8.GetString(decryptedChatMsg);
+                        string sentMes = $"{myInfo.Name}: {chatMsg}";
+
                         Console.WriteLine($"Revieved = {sentMes}");
-                        
-                        connectedClients.SendMessageToAll(sentMes, myInfo);
+
+                        //connectedClients.SendMessageToAll($"{myInfo.Name}: A msg", myInfo);
 
                         break;
                     case TCPMessagesTypes.C_RequestListMsg:
                         string listUser = connectedClients.GetNameOfAllAsSingleString().ToString();
                         string users = $"\nOnline users:\n{listUser}\n";
-                        TCPListMsg listMsg = new TCPListMsg() { List = users};
+                        TCPListMsg listMsg = new TCPListMsg() { List = users };
                         myInfo.SendMessage(listMsg);
 
                         break;
@@ -104,6 +106,144 @@ public static class Program
             connectedClients.SendMessageToAll(myInfo.Name + " left the server...");
         }
     }
+}
+
+public class ConnectedClients
+{
+    Dictionary<Guid, ClientInfo> clientsByGuid = new Dictionary<Guid, ClientInfo>();
+    public void AddClient(Guid clientGuid, TcpClient client)
+    {
+        clientsByGuid.Add(clientGuid, new ClientInfo(client) { ClientGuid = clientGuid });
+    }
+
+    public void RemoveClient(Guid clientGuid)
+    {
+        clientsByGuid[clientGuid].Dispose();
+        clientsByGuid.Remove(clientGuid);
+
+    }
+
+    public ClientInfo this[Guid clientGuid]
+    {
+        get { return clientsByGuid[clientGuid]; }
+        set { clientsByGuid[clientGuid] = value; }
+    }
+
+    public string GetNameOfAllAsSingleString()
+    {
+        List<string> names = new List<string>();
+        foreach (var clientInfo in clientsByGuid.Values)
+        {
+            names.Add(clientInfo.Name);
+        }
+        return string.Join(Environment.NewLine, names);
+    }
+    public void SendMessageToAll(string message, ClientInfo info = null)
+    {
+        foreach (var kvp in clientsByGuid)
+        {
+            if (info != null && info == kvp.Value) continue;
+            kvp.Value.SendMessage(message);
+        }
+    }
+
+    public void SendMessageToAll(TCPNetworkMessage message)
+    {
+        foreach (var kvp in clientsByGuid)
+        {
+            kvp.Value.SendMessage(message);
+        }
+    }
+
+    public void SendDirectMessage(string message, string recipient, Guid sender)
+    {
+        var foundClient = clientsByGuid.Values.FirstOrDefault(clientInfo => clientInfo.Name == recipient);
+        if (foundClient != null)
+        {
+            foundClient.SendMessage(message);
+        }
+        else
+        {
+            clientsByGuid[sender].SendMessage(recipient + " is not online!");
+        }
+
+    }
+
+}
+
+public class ClientInfo
+{
+    public Guid ClientGuid { get; set; }
+    public TcpClient client;
+    public string Name { get; set; } = string.Empty;
+    BinaryWriter bWriter;
+    public ClientInfo(TcpClient client)
+    {
+        bWriter = new BinaryWriter(client.GetStream());
+        this.client = client;
+    }
+    public void SendMessage(string message)
+    {
+        byte[] messageBytes = new byte[1024];
+        TCPServerMsg mes = new TCPServerMsg() { Message = message };
+        messageBytes = MessagePackSerializer.Serialize(mes);
+
+        bWriter.Write(messageBytes.Length);
+        bWriter.Write(mes.GetMessageTypeAsByte);
+        bWriter.Write(messageBytes);
+        bWriter.Flush();
+    }
+
+    public void SendMessage(TCPNetworkMessage message)
+    {
+        byte[] messageBytes = new byte[1024];
+
+        switch (message.MessageType)
+        {
+            case TCPMessagesTypes.S_AnswerKey:
+                messageBytes = MessagePackSerializer.Serialize((TCPAnswerKeyMsg)message);
+                break;
+            case TCPMessagesTypes.ChatMessage:
+                messageBytes = MessagePackSerializer.Serialize((TCPChatMsg)message);
+                break;
+            case TCPMessagesTypes.S_WelcomeNewUser:
+                messageBytes = MessagePackSerializer.Serialize((TCPWelcomeMsg)message);
+                break;
+            case TCPMessagesTypes.S_ServerMessage:
+                messageBytes = MessagePackSerializer.Serialize((TCPServerMsg)message);
+                break;
+            case TCPMessagesTypes.S_ListMsg:
+                messageBytes = MessagePackSerializer.Serialize((TCPListMsg)message);
+                break;
+            default:
+                return;
+        }
+
+        bWriter.Write(messageBytes.Length);
+        bWriter.Write(message.GetMessageTypeAsByte);
+        bWriter.Write(messageBytes);
+        bWriter.Flush();
+    }
+
+    public void Dispose()
+    {
+        bWriter.Dispose();
+        client.Dispose();
+    }
+}
+
+public class PostRestData
+{
+    public PostRestData(string name, string mess)
+    {
+        this.Message = mess;
+        this.Name = name;
+    }
+
+    public string Message { get; }
+    public string Name { get; }
+}
+
 
     //static void HandleDirectMessage(DirectMessage dMes, Guid sender)
     //{
@@ -114,7 +254,6 @@ public static class Program
     //{
     //    connectedClients.SendMessageToAll(connectedClients[sender].Name + " : " + mes.Message);
     //}
-}
 
 //internal class Program
 //{
@@ -280,137 +419,3 @@ public static class Program
 
 //    }
 //}
-
-public class ConnectedClients
-{
-    Dictionary<Guid, ClientInfo> clientsByGuid = new Dictionary<Guid, ClientInfo>();
-    public void AddClient(Guid clientGuid, TcpClient client)
-    {
-        clientsByGuid.Add(clientGuid, new ClientInfo(client) { ClientGuid = clientGuid });
-
-    }
-
-    public void RemoveClient(Guid clientGuid)
-    {
-        clientsByGuid[clientGuid].Dispose();
-        clientsByGuid.Remove(clientGuid);
-
-    }
-
-    public ClientInfo this[Guid clientGuid]
-    {
-        get { return clientsByGuid[clientGuid]; }
-        set { clientsByGuid[clientGuid] = value; }
-    }
-
-    public string GetNameOfAllAsSingleString()
-    {
-        List<string> names = new List<string>();
-        foreach (var clientInfo in clientsByGuid.Values)
-        {
-            names.Add(clientInfo.Name);
-        }
-        return string.Join(Environment.NewLine, names);
-    }
-    public void SendMessageToAll(string message, ClientInfo info = null)
-    {
-        foreach (var kvp in clientsByGuid)
-        {
-            if (info != null && info == kvp.Value) continue;
-            kvp.Value.SendMessage(message);
-        }
-    }
-
-    public void SendMessageToAll(TCPNetworkMessage message)
-    {
-        foreach (var kvp in clientsByGuid)
-        {
-            kvp.Value.SendMessage(message);
-        }
-    }
-
-    public void SendDirectMessage(string message, string recipient, Guid sender)
-    {
-        var foundClient = clientsByGuid.Values.FirstOrDefault(clientInfo => clientInfo.Name == recipient);
-        if (foundClient != null)
-        {
-            foundClient.SendMessage(message);
-        }
-        else
-        {
-            clientsByGuid[sender].SendMessage(recipient + " is not online!");
-        }
-
-    }
-
-}
-public class ClientInfo
-{
-    public Guid ClientGuid { get; set; }
-    public TcpClient client;
-    public string Name { get; set; } = string.Empty;
-    BinaryWriter bWriter;
-    public ClientInfo(TcpClient client)
-    {
-        bWriter = new BinaryWriter(client.GetStream());
-        this.client = client;
-    }
-    public void SendMessage(string message)
-    {
-        byte[] messageBytes = new byte[1024];
-        TCPServerMsg mes = new TCPServerMsg() { Message = message };
-        messageBytes = MessagePackSerializer.Serialize(mes);
-
-        bWriter.Write(messageBytes.Length);
-        bWriter.Write(mes.GetMessageTypeAsByte);
-        bWriter.Write(messageBytes);
-        bWriter.Flush();
-    }
-
-    public void SendMessage(TCPNetworkMessage message)
-    {
-        byte[] messageBytes = new byte[1024];
-
-        switch (message.MessageType)
-        {
-            case TCPMessagesTypes.S_AnswerKey:
-                messageBytes = MessagePackSerializer.Serialize((TCPAnswerKeyMsg)message);
-                break;
-            case TCPMessagesTypes.ChatMessage:
-                messageBytes = MessagePackSerializer.Serialize((TCPChatMsg)message);
-                break;
-            case TCPMessagesTypes.S_WelcomeNewUser:
-                messageBytes = MessagePackSerializer.Serialize((TCPWelcomeMsg)message);
-                break;
-            case TCPMessagesTypes.S_ServerMessage:
-                messageBytes = MessagePackSerializer.Serialize((TCPServerMsg)message);
-                break;
-            case TCPMessagesTypes.S_ListMsg:
-                messageBytes = MessagePackSerializer.Serialize((TCPListMsg)message);
-                break;
-        }
-
-        bWriter.Write(messageBytes.Length);
-        bWriter.Write(message.GetMessageTypeAsByte);
-        bWriter.Write(messageBytes);
-        bWriter.Flush();
-    }
-
-    public void Dispose()
-    {
-        bWriter.Dispose();
-        client.Dispose();
-    }
-}
-
-public class PostRestData
-{
-    public PostRestData(string name, string mess)
-    {
-        this.Message = mess;
-        this.Name = name;
-    }
-
-    public string Message { get; }
-    public string Name { get; }
-}
