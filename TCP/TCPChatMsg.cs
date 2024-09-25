@@ -39,6 +39,8 @@ namespace TCP
     #region Sets up the Key
     public class TCPRequestKeyMsg : TCPNetworkMessage
     {
+        [Key(0)]
+        public byte[] ClientKey { get; set; }
         [IgnoreMember]
         public override TCPMessagesTypes MessageType => TCPMessagesTypes.C_RequestKey;
     }
@@ -46,7 +48,7 @@ namespace TCP
     public class TCPAnswerKeyMsg : TCPNetworkMessage
     {
         [Key(0)]
-        public byte[] Key { get; set; }
+        public byte[] ServerKey { get; set; }
         [IgnoreMember]
         public override TCPMessagesTypes MessageType => TCPMessagesTypes.S_AnswerKey;
     }

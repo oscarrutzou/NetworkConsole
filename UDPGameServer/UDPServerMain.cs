@@ -34,6 +34,7 @@ public static class UDPServerMain
 
     public static void Main(string[] args)
     {
+        Console.WriteLine("I'm the UDP Game server\n");
         Clients = new();
         // Thread that deletes clients if they have lost connection
         Thread heartBeatDeleteWhenOffline = new Thread(HeartBeatDeleteWhenOffline);
@@ -126,7 +127,6 @@ public static class UDPServerMain
     // Give aceess so the first client can change pos
     // Say to the other client whos turn it is. 
     // Wait for answer
-
     static void GameUpdate()
     {
         bool first = false;
@@ -152,6 +152,7 @@ public static class UDPServerMain
 
             while (!haveMoved)
             {
+                // Lock to limit so we dont get spammed with request for new positions.
                 lock (_moveRequestLock)
                 {
                     if (_requestMovePosMsg == null)
@@ -262,6 +263,12 @@ public static class UDPServerMain
 
         _gameGrid = new Grid(_gridX, _gridY);
 
+        int spawnTimes = 1;
+        Random random = new Random();
+        int minDmg = 5;
+        int maxDmg = 15;
+        int minHealth = 10;
+        int maxHealth = 30;
         for (int i = 0; i < Clients.Count; i++)
         {
             for (int j = 0; j < _amountOfCharactersPrPlayers; j++)
@@ -274,9 +281,9 @@ public static class UDPServerMain
                     int y = _rnd.Next(0, _gridY);
                     if (_gameGrid.CharacterGrid[x, y] != null) continue;
                     hasFoundSpot = true;
-
-                    Character player = new Character(i, new Point(x, y), $"Bob {i + j}", CharacterType.Warrior, 5, 20);
+                    Character player = new Character(i, new Point(x, y), $"Bob {spawnTimes}", CharacterType.Warrior, random.Next(minDmg, maxDmg), random.Next(minHealth, maxHealth));
                     _gameGrid.AddObject(player, x, y);
+                    spawnTimes++;
                 }
             }
         }
@@ -296,10 +303,10 @@ public static class UDPServerMain
     static void SendTurnMsg()
     {
         //Make a base response for the current turn user, and otherwise its a waiting turn.
-        string othersResponseMessage = $"Its {_turnNmb} turn...";
+        string othersResponseMessage = $"Its {_turnNmb} turn, please wait...";
         byte[] othersResponseData = Encoding.ASCII.GetBytes(othersResponseMessage);
 
-        string responseMessage = $"Its your turn...";
+        string responseMessage = $"Its your turn ({_turnNmb}...";
         byte[] responseData = Encoding.ASCII.GetBytes(responseMessage);
 
         TurnMsg turnMsg;
@@ -320,20 +327,16 @@ public static class UDPServerMain
         _currentTurnClientData = Clients[_turnNmb];
         UpdateGrid();
     }
-    /*
-        ae82d696-d7a0-4f0f-ab37-148fef010697: HeartBeat 27,6417 ms
-        NEW CLIENT: 127.0.0.1:52256:: ID: 89bc3871-6d01-44ea-bf8b-2d76fa7c6788
-        Started game with 2 players
-        ae82d696-d7a0-4f0f-ab37-148fef010697: HeartBeat 15,38 ms
-        89bc3871-6d01-44ea-bf8b-2d76fa7c6788: HeartBeat 15,5247 ms
 
-     */
+    /// <summary>
+    /// <para>Deletes clients if the time from last heartbeat is too long</para>
+    /// <para>Set up to stop the game if ANY client gets disconnected</para>
+    /// </summary>
     static void HeartBeatDeleteWhenOffline()
     {
         List<ClientData> clientToDelete = new();
         while (true)
         {
-            //if (Clients.Count == 0) Thread.Sleep(1000);
             Thread.Sleep(500);
             clientToDelete.Clear();
 
@@ -342,7 +345,7 @@ public static class UDPServerMain
             {
                 TimeSpan timeSpan = DateTime.Now - data.LastHeartBeat;
 
-
+                // If there has elapsed more than 2 seconds
                 if (timeSpan.TotalMilliseconds >= 2000)
                 {
                     clientToDelete.Add(data);
@@ -357,9 +360,6 @@ public static class UDPServerMain
                 Clients.Remove(clientIndex);
                 StopGame(stopMsg);
             }
-            //lock (_clientLock)
-            //{
-            //}
         }
     }
 

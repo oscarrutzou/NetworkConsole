@@ -5,6 +5,8 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        Console.WriteLine("I'm the REST ChatLog server\n");
+
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.

@@ -33,6 +33,14 @@ public static class Encryption
         return chatMes;
     }
 
+    public static byte[] GetRandomKey()
+    {
+        SHA256 sHA = SHA256.Create();
+        Random rnd = new Random();
+        string rndNbm = rnd.Next(100000000).ToString();
+        return sHA.ComputeHash(Encoding.UTF8.GetBytes(rndNbm)); // A random key
+    }
+
     public static byte[] Encrypt(byte[] plainBytes, byte[] key, byte[] iv)
     {
         using (Aes aes = Aes.Create())

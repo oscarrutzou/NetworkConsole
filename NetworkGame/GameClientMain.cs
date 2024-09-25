@@ -24,6 +24,7 @@ public static class GameClientMain
 
     public static void Main(string[] args)
     {
+        Console.WriteLine("I'm the Game Client\n");
         // Send start msg
         _endPoint = new IPEndPoint(_serverIP, _serverPort);
 
@@ -38,11 +39,6 @@ public static class GameClientMain
         Update();
     }
 
-    static void SendStartMsg()
-    {
-        RequestAddClientMsg requestAddClientMsg = new RequestAddClientMsg();
-        SendMessage(requestAddClientMsg, _endPoint);
-    }
 
     static void DrawGrid()
     {
@@ -101,6 +97,12 @@ public static class GameClientMain
     }
 
     #region UDP
+
+    static void SendStartMsg()
+    {
+        RequestAddClientMsg requestAddClientMsg = new RequestAddClientMsg();
+        SendMessage(requestAddClientMsg, _endPoint);
+    }
 
     static void HeartBeatMessage()
     {
@@ -219,6 +221,12 @@ public static class GameClientMain
 
         switch (message.MessageType)
         {
+            // Dont need to serialize the Messages that dont contain anything like (RequestAddClient).
+            // This is since we already have a enum that will be used when sending the package.
+            // But insted of keeping track on what request / messages that have data, we just serialize it for safety.
+            case MessageType.RequestAddClient:
+                messageBytes = MessagePackSerializer.Serialize((RequestAddClientMsg)message);
+                break;
             case MessageType.RequestMovePosition:
                 messageBytes = MessagePackSerializer.Serialize((RequestMovePosMsg)message);
                 break;

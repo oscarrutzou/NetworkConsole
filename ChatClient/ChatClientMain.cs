@@ -14,8 +14,14 @@ public static class ChatClientMain
 {
     static BinaryWriter _bw = null;
     static TcpClient server;
+    private static byte[] _clientKey;
+    private static byte[] _serverKey;
+
     public static void Main(string[] args)
     {
+        Console.WriteLine("I'm the Chat Client\n");
+        _clientKey = Encryption.GetRandomKey();
+
         TcpClient server = new TcpClient();
         server.Connect("localhost", 12000);
         _bw = new BinaryWriter(server.GetStream());
@@ -24,7 +30,7 @@ public static class ChatClientMain
         Thread receiveThread = new Thread(() => ReceiveMessages(server));
         receiveThread.Start();
 
-        SendMessage(new TCPRequestKeyMsg());
+        SendMessage(new TCPRequestKeyMsg() { ClientKey = _clientKey});
 
         Console.WriteLine("Connected to server...\nWrite userName");
         bool userNameNotAdded = true;
@@ -96,9 +102,8 @@ public static class ChatClientMain
                 break;
 
             case TCPMessagesTypes.ChatMessage:
-                messageBytes = Encryption.SerilizeChatMsg((TCPChatMsg)message, _key);
+                messageBytes = Encryption.SerilizeChatMsg((TCPChatMsg)message, _clientKey);
                 break;
-
             case TCPMessagesTypes.C_JoinServer:
                 messageBytes = MessagePackSerializer.Serialize((TCPJoinServerMsg)message);
                 break;
@@ -113,11 +118,9 @@ public static class ChatClientMain
         _bw.Write(messageBytes.Length);
         _bw.Write(message.GetMessageTypeAsByte);
         _bw.Write(messageBytes);
-       
         _bw.Flush();
     }
     
-    private static byte[] _key;
 
     private static void ReceiveMessages(TcpClient client)
     {
@@ -134,7 +137,7 @@ public static class ChatClientMain
             {
                 case TCPMessagesTypes.S_AnswerKey:
                     TCPAnswerKeyMsg keyMsg = MessagePackSerializer.Deserialize<TCPAnswerKeyMsg>(messageBytes);
-                    _key = keyMsg.Key;
+                    _serverKey = keyMsg.ServerKey;
                     break;
 
                 case TCPMessagesTypes.S_WelcomeNewUser:
@@ -143,7 +146,7 @@ public static class ChatClientMain
                     break;
 
                 case TCPMessagesTypes.ChatMessage:
-                    TCPChatMsg chatMes = Encryption.DeSerilizeChatMsg(messageBytes, _key);
+                    TCPChatMsg chatMes = Encryption.DeSerilizeChatMsg(messageBytes, _serverKey);
                     Console.WriteLine(chatMes.Temp_Text);
                     break;
 

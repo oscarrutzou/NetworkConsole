@@ -14,15 +14,12 @@ public static class Program
     private static TcpListener server = new TcpListener(IPAddress.Any, 12000);
     static string apiUrl = "https://localhost:7019/LogChat";
 
-    public static TCPAnswerKeyMsg AnswerKeyMsg;
     public static void Main(string[] args)
     {
+        Console.WriteLine("I'm the TCP Chat server\n");
 
         server.Start();
         Console.WriteLine("Server started... listening on port 12000");
-        SHA256 sHA = SHA256.Create();
-        byte[] key = sHA.ComputeHash(Encoding.UTF8.GetBytes("secureKey:d")); // A random key
-        AnswerKeyMsg = new TCPAnswerKeyMsg() { Key = key };
 
         while (true)
         {
@@ -53,8 +50,13 @@ public static class Program
                 switch (recievedType)
                 {
                     case TCPMessagesTypes.C_RequestKey:
-                        Console.WriteLine($"Been requested key from {myInfo.ClientGuid}");
-                        myInfo.SendMessage(AnswerKeyMsg);
+                        TCPRequestKeyMsg requestKeyMsg = MessagePackSerializer.Deserialize<TCPRequestKeyMsg>(messageBytes);
+                        myInfo.ClientKey = requestKeyMsg.ClientKey;
+                        Console.WriteLine($"Recived client key {requestKeyMsg.ClientKey} from {myInfo.ClientGuid}");
+                        Console.WriteLine($"Been requested server key from {myInfo.ClientGuid}");
+
+                        TCPAnswerKeyMsg answerKeyMsg = new TCPAnswerKeyMsg() { ServerKey = myInfo.ServerKey};
+                        myInfo.SendMessage(answerKeyMsg);
                         continue;
                 }
 
@@ -76,7 +78,7 @@ public static class Program
                         connectedClients.SendMessageToAll(welcomeMsg + ": Say hallo:D", myInfo);
                         break;
                     case TCPMessagesTypes.ChatMessage:
-                        TCPChatMsg chatMes = Encryption.DeSerilizeChatMsg(messageBytes, AnswerKeyMsg.Key);
+                        TCPChatMsg chatMes = Encryption.DeSerilizeChatMsg(messageBytes, myInfo.ClientKey);
                         string sentMes = $"{myInfo.Name}: {chatMes.Temp_Text}";
                         Console.WriteLine($"Revieved = {sentMes}");
                         PostMessage(sentMes);
@@ -128,9 +130,7 @@ public static class Program
             // Håndter fejlresponsen (statuskode er ikke 2xx)
             Console.WriteLine($"POST-anmodning mislykkedes. Statuskode: {response.StatusCode}");
         }
-
     }
-
 
     // Through REST GET the message to client
     static async void GetMessage(ClientInfo requester)
@@ -220,10 +220,13 @@ public class ClientInfo
     public Guid ClientGuid { get; set; }
     public TcpClient client;
     public string Name { get; set; } = string.Empty;
+    public byte[] ServerKey {  get; set; }
+    public byte[] ClientKey {  get; set; }
     BinaryWriter bWriter;
     public ClientInfo(TcpClient client)
     {
         bWriter = new BinaryWriter(client.GetStream());
+        ServerKey = Encryption.GetRandomKey();
         this.client = client;
     }
     public void SendMessage(string message)
@@ -231,7 +234,7 @@ public class ClientInfo
         byte[] messageBytes = new byte[1024];
         TCPChatMsg mes = new TCPChatMsg() { Temp_Text = message };
 
-        messageBytes = Encryption.SerilizeChatMsg(mes, Program.AnswerKeyMsg.Key);
+        messageBytes = Encryption.SerilizeChatMsg(mes, ServerKey);
 
         bWriter.Write(messageBytes.Length);
         bWriter.Write(mes.GetMessageTypeAsByte);
@@ -249,7 +252,7 @@ public class ClientInfo
                 messageBytes = MessagePackSerializer.Serialize((TCPAnswerKeyMsg)message);
                 break;
             case TCPMessagesTypes.ChatMessage:
-                messageBytes = Encryption.SerilizeChatMsg((TCPChatMsg)message, Program.AnswerKeyMsg.Key);
+                messageBytes = Encryption.SerilizeChatMsg((TCPChatMsg)message, ServerKey);
                 break;
             case TCPMessagesTypes.S_WelcomeNewUser:
                 messageBytes = MessagePackSerializer.Serialize((TCPWelcomeMsg)message);
